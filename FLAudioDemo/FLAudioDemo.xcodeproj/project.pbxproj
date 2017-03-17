@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		110FE3521E7BF6A2007A2A3C /* FLAudioServices.m in Sources */ = {isa = PBXBuildFile; fileRef = 110FE3511E7BF6A2007A2A3C /* FLAudioServices.m */; };
 		111ECC461E383C3D0001A2B6 /* MP3Sample.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 111ECC451E383C3D0001A2B6 /* MP3Sample.mp3 */; };
 		1144E6041E2896BB00A9A9FB /* testView.m in Sources */ = {isa = PBXBuildFile; fileRef = 1144E6031E2896BB00A9A9FB /* testView.m */; };
 		115151061E27158F000DC167 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 115151051E27158F000DC167 /* main.m */; };
@@ -19,6 +20,8 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		110FE3501E7BF6A2007A2A3C /* FLAudioServices.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = FLAudioServices.h; sourceTree = "<group>"; };
+		110FE3511E7BF6A2007A2A3C /* FLAudioServices.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = FLAudioServices.m; sourceTree = "<group>"; };
 		111ECC451E383C3D0001A2B6 /* MP3Sample.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = MP3Sample.mp3; sourceTree = "<group>"; };
 		1144E6021E2896BB00A9A9FB /* testView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = testView.h; sourceTree = "<group>"; };
 		1144E6031E2896BB00A9A9FB /* testView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = testView.m; sourceTree = "<group>"; };
@@ -70,6 +73,8 @@
 				115151081E27158F000DC167 /* AppDelegate.m */,
 				1151510A1E27158F000DC167 /* ViewController.h */,
 				1151510B1E27158F000DC167 /* ViewController.m */,
+				110FE3501E7BF6A2007A2A3C /* FLAudioServices.h */,
+				110FE3511E7BF6A2007A2A3C /* FLAudioServices.m */,
 				1151511B1E27473E000DC167 /* DemoViewController.h */,
 				1151511C1E27473E000DC167 /* DemoViewController.m */,
 				1144E6021E2896BB00A9A9FB /* testView.h */,
@@ -167,6 +172,7 @@
 			files = (
 				1151510C1E27158F000DC167 /* ViewController.m in Sources */,
 				115151091E27158F000DC167 /* AppDelegate.m in Sources */,
+				110FE3521E7BF6A2007A2A3C /* FLAudioServices.m in Sources */,
 				115151061E27158F000DC167 /* main.m in Sources */,
 				1144E6041E2896BB00A9A9FB /* testView.m in Sources */,
 				1151511D1E27473E000DC167 /* DemoViewController.m in Sources */,

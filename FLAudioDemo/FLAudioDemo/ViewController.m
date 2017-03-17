@@ -8,11 +8,12 @@
 
 #import "ViewController.h"
 #import <AudioToolbox/AudioToolbox.h>
-
+#import "FLAudioServices.h"
 #import "DemoViewController.h"
 
 @interface ViewController ()
-
+@property (nonatomic,strong)FLAudioRecorder *recoder;
+@property (strong, nonatomic) FLAudioPlayer *player;//播放器对象
 @end
 
 @implementation ViewController
@@ -212,17 +213,17 @@ void fl_AudioFileStream_PacketsProc(
     CFStringRef strRef = (__bridge CFStringRef)filePath;
 #warning CFURLCreateFromFileSystemRepresentation 官方文档写这个 
     // CFURLPathStyle 不建议使用kCFURLHFSPathStyle。 使用HFS样式路径的Carbon文件管理器已被弃用。 HFS样式路径不可靠，因为它们可以随意引用多个卷（如果这些卷具有相同的卷名称）。 您应该尽可能使用kCFURLPOSIXPathStyle。
-//    CFURLRef audioFileURL =
-//    CFURLCreateWithFileSystemPath(NULL,
-//                                  strRef,
-//                                  kCFURLPOSIXPathStyle,
-//                                  YES
-//                                  );
+    CFURLRef audioFileURL =
+    CFURLCreateWithFileSystemPath(NULL,
+                                  strRef,
+                                  kCFURLPOSIXPathStyle,
+                                  YES
+                                  );
     
     
-    CFURLRef audioFileURL = CFURLCreateWithString(NULL, strRef, NULL);
+//    CFURLRef audioFileURL = CFURLCreateWithString(NULL, strRef, NULL);
     
-    struct AQPlayerState aqData;                    // 1
+    struct AQPlayerState aqData;
     
     
     
@@ -431,17 +432,49 @@ void fl_AudioFileStream_PacketsProc(
 }
 
 
-- (void)viewDidLoad{
-    [super viewDidLoad];
+//- (void)viewDidLoad{
+//    [super viewDidLoad];
+//
+//}
+//
+//- (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event{
+//    NSString *path = [[NSBundle mainBundle] pathForResource:@"MP3Sample" ofType:@"mp3"];
+////    NSString *path = @"http://www.yaragroovy.cn/html/MP3Sample.mp3";
+//    [self fl_openAudioFile:path];
+//}
 
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    // Do any additional setup after loading the view, typically from a nib.
+    self.recoder = [[FLAudioRecorder alloc] init];
+    [self.recoder fl_prepareToRecord];
 }
+
 
 - (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event{
-    NSString *path = [[NSBundle mainBundle] pathForResource:@"MP3Sample" ofType:@"mp3"];
-//    NSString *path = @"http://www.yaragroovy.cn/MP3Sample.mp3";
-    [self fl_openAudioFile:path];
+    [self.recoder fl_start:^{
+        NSLog(@"start");
+    }];
+    
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        [self.recoder fl_stop:^(NSData *data) {
+            NSLog(@"stop:%@",data);
+            
+        }];
+    });
+    
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        self.player = [[FLAudioPlayer alloc] initWithUrl:@"hTtp://ws.stream.qqmusic.qq.com/M500001VfvsJ21xFqb.mp3?guid=ffffffff82def4af4b12b3cd9337d5e7&uin=346897220&vkey=6292F51E1E384E061FF02C31F716658E5C81F5594D561F2E88B854E81CAAB7806D5E4F103E55D33C16F3FAC506D1AB172DE8600B37E43FAD&fromtag=46"];
+        
+        [self.player fl_start:nil];
+    });
+    
 }
 
+- (NSString *)fl_filePath{
+    NSString *path = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) lastObject];
+    return [path stringByAppendingPathComponent:@"voice.caf"];
+}
 
 
 @end
