@@ -27,7 +27,6 @@
     // 先stop
     [self fl_stop:nil];
     
-    
     switch ([AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeAudio]) {
         case AVAuthorizationStatusAuthorized:{
             // already authorize,init capture session
@@ -233,6 +232,24 @@
         self.fl_playerStatus = Player_Stoping;
     }
 }
+
+- (void)fl_seekToTime:(double)time complete:(void (^)(BOOL finished))complete{
+    NSAssert(time < 0, @"time could not be negatived");
+    if (self.player) {
+        if (self.fl_playerStatus == Player_Playing) {
+            [self fl_pause:nil];
+        }
+        __weak typeof(self) weakSelf = self;
+        [self.player seekToTime:CMTimeMakeWithSeconds(time, 1 *NSEC_PER_SEC) completionHandler:^(BOOL finished) {
+            typeof(self) strongSelf = weakSelf;
+            [strongSelf fl_start:nil];
+            if (complete) {
+                complete(finished);
+            }
+        }];
+    }
+}
+
 
 @end
 

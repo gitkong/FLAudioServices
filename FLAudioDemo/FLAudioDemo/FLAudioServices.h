@@ -134,6 +134,12 @@ typedef NS_ENUM(NSInteger,FLAudioPlayerStatus){
  *  结束播放
  */
 - (void)fl_stop:(void(^)())complete;
+/*
+ *  BY gitKong
+ *
+ *  设置当前播放进度
+ */
+- (void)fl_seekToTime:(double)time complete:(void (^)(BOOL finished))complete;
 
 @end
 
