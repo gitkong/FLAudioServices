@@ -64,7 +64,7 @@
     AudioSessionSetProperty(kAudioSessionProperty_OverrideCategoryDefaultToSpeaker, sizeof(doChangeDefault), &doChangeDefault);
     NSError *error;
     /* The file type to record is inferred from the file extension. Will overwrite a file at the specified url if a file exists */
-    self.recoder = [[AVAudioRecorder alloc] initWithURL:[NSURL URLWithString:[self fl_filePath]] settings:[self fl_recorderSetting] error:&error];
+    self.recoder = [[AVAudioRecorder alloc] initWithURL:[NSURL fileURLWithPath:[self fl_filePath]] settings:[self fl_recorderSetting] error:&error];
     if (error) {
         NSLog(@"Error: %@", [error localizedDescription]);
         return;
@@ -88,6 +88,9 @@
         if (complete) {
             complete();
         }
+    }
+    else{
+        NSLog(@"请先 prepare");
     }
 }
 
@@ -186,10 +189,14 @@
 
 @implementation FLAudioPlayer
 
+BOOL fl_isNetUrl(NSString *urlString){
+    return [[urlString substringToIndex:4] caseInsensitiveCompare:@"http"] == NSOrderedSame || [[urlString substringToIndex:5] caseInsensitiveCompare:@"https"] == NSOrderedSame;
+}
+
 - (instancetype)initWithUrl:(NSString *)urlString{
     if (self = [super init]) {
         NSURL *url = nil;
-        if ([[urlString substringToIndex:4] caseInsensitiveCompare:@"http"] == NSOrderedSame || [[urlString substringToIndex:5] caseInsensitiveCompare:@"https"] == NSOrderedSame) {
+        if (fl_isNetUrl(urlString)) {
             NSLog(@"same");
             url = [NSURL URLWithString:urlString];
         }
