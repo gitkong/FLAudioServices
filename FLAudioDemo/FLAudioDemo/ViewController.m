@@ -12,6 +12,11 @@
 
 @interface ViewController ()
 @property (nonatomic,strong)FLAudioRecorder *recoder;
+@property (weak, nonatomic) IBOutlet UISlider *slider;
+@property (weak, nonatomic) IBOutlet UILabel *startLabel;
+@property (weak, nonatomic) IBOutlet UILabel *endLabel;
+@property (weak, nonatomic) IBOutlet UISwitch *recordSwitch;
+@property (weak, nonatomic) IBOutlet UISwitch *playSwitch;
 @property (strong, nonatomic) FLAudioPlayer *player;//播放器对象
 @end
 
@@ -447,29 +452,40 @@ void fl_AudioFileStream_PacketsProc(
     // Do any additional setup after loading the view, typically from a nib.
     self.recoder = [[FLAudioRecorder alloc] init];
     [self.recoder fl_prepareToRecord];
-}
-
-
-- (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event{
-    [self.recoder fl_start:^{
-        NSLog(@"start");
-    }];
     
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        [self.recoder fl_stop:^(NSData *data) {
-            NSLog(@"stop:%@",data);
-            
+    
+    
+}
+- (IBAction)clickToRecord:(id)sender {
+    if (self.recordSwitch.on) {
+        [self.recoder fl_start:^{
+            NSLog(@"start");
         }];
-    });
-    
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        NSString *str = @"hTtp://ws.stream.qqmusic.qq.com/M500001VfvsJ21xFqb.mp3?guid=ffffffff82def4af4b12b3cd9337d5e7&uin=346897220&vkey=6292F51E1E384E061FF02C31F716658E5C81F5594D561F2E88B854E81CAAB7806D5E4F103E55D33C16F3FAC506D1AB172DE8600B37E43FAD&fromtag=46";
-        self.player = [[FLAudioPlayer alloc] initWithUrl:[self fl_filePath]];
-        
-        [self.player fl_start:nil];
-    });
-    
+    }
+    else{
+        [self.recoder fl_stop:^(NSData *data) {
+            NSLog(@"stop");
+        }];
+    }
 }
+
+- (IBAction)clickToPlay:(id)sender {
+    if (self.playSwitch.on) {
+        NSString *str = @"hTtp://ws.stream.qqmusic.qq.com/M500001VfvsJ21xFqb.mp3?guid=ffffffff82def4af4b12b3cd9337d5e7&uin=346897220&vkey=6292F51E1E384E061FF02C31F716658E5C81F5594D561F2E88B854E81CAAB7806D5E4F103E55D33C16F3FAC506D1AB172DE8600B37E43FAD&fromtag=46";
+        self.player = [[FLAudioPlayer alloc] initWithUrl:str];
+        __weak typeof(self) weakSelf = self;
+        [self.player fl_start:^{
+            weakSelf.startLabel.text = [NSString stringWithFormat:@"%lf",weakSelf.player.currentTime];
+            weakSelf.endLabel.text = [NSString stringWithFormat:@"%lf",weakSelf.player.totalTime];
+        }];
+    }
+    else{
+        [self.player fl_pause:^{
+            NSLog(@"pause");
+        }];
+    }
+}
+
 
 - (NSString *)fl_filePath{
     NSString *path = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) lastObject];

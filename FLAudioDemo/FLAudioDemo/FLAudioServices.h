@@ -105,9 +105,14 @@ typedef NS_ENUM(NSInteger,FLAudioPlayerStatus){
 /*
  *  BY gitKong
  *
- *  录音状态
+ *  播放状态
  */
 @property (nonatomic,assign,readonly)FLAudioPlayerStatus fl_playerStatus;
+
+@property (nonatomic,assign,readonly)double totalTime;
+
+@property (nonatomic,assign,readonly)double currentTime;
+
 /*
  *  BY gitKong
  *

@@ -257,6 +257,16 @@ BOOL fl_isNetUrl(NSString *urlString){
     }
 }
 
+#pragma mark - setter & getter
+
+- (double)totalTime{
+    return CMTimeGetSeconds(self.player.currentItem.asset.duration);
+}
+
+- (double)currentTime{
+    return CMTimeGetSeconds(self.player.currentTime);
+}
+
 
 @end
 
