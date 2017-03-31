@@ -42,7 +42,6 @@
 - (IBAction)clickToRecord:(id)sender {
     __weak typeof(self) weakSelf = self;
     if (self.recordSwitch.on) {
-        [self.recoder fl_prepareToRecord];
         [self.recoder fl_start:^{
             NSLog(@"start");
             typeof(self) strongSelf = weakSelf;

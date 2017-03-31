@@ -18,27 +18,26 @@
 
 - (instancetype)init{
     if (self = [super init]) {
-        [self fl_default];
+        [self fl_initRecoder];
     }
     return self;
 }
 
-
-- (void)fl_prepareToRecord{
+- (void)fl_initRecoder{
     // 先stop
     [self fl_stop:nil];
-    
+    [self fl_default];
     switch ([AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeAudio]) {
         case AVAuthorizationStatusAuthorized:{
             // already authorize,init capture session
-            [self fl_createAudioRecorder];
+            [self fl_createAudioRecorder:YES];
             break;
         }
         case AVAuthorizationStatusNotDetermined:{
             // waiting user to authorize
             [AVCaptureDevice requestAccessForMediaType:AVMediaTypeAudio completionHandler:^(BOOL granted) {
                 if (granted) {
-                    [self fl_createAudioRecorder];
+                    [self fl_createAudioRecorder:YES];
                 }
                 else{
                     [self fl_showAuthTip];
@@ -50,10 +49,20 @@
             [self fl_showAuthTip];
             break;
     }
-    
 }
 
-- (void)fl_createAudioRecorder{
+- (void)fl_prepareToRecord{
+    if (self.recoder) {
+        if ([self.recoder prepareToRecord]) {
+            self.fl_recorderStatus = Recoder_Prepared;
+        }
+        else{
+            self.fl_recorderStatus = Recoder_NotPrepare;
+        }
+    }
+}
+
+- (void)fl_createAudioRecorder:(BOOL)prepare{
     NSError *error;
     AVAudioSession * audioSession = [AVAudioSession sharedInstance];
     // 设置类别,表示该应用同时支持播放和录音
@@ -74,11 +83,8 @@
     self.recoder.delegate = self;
     // 开启音量检测
     self.recoder.meteringEnabled = YES;
-    if ([self.recoder prepareToRecord]) {
-        self.fl_recorderStatus = Recoder_Prepared;
-    }
-    else{
-        self.fl_recorderStatus = Recoder_NotPrepare;
+    if (prepare) {
+        [self fl_prepareToRecord];
     }
 }
 
