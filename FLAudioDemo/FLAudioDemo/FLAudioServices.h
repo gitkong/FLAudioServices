@@ -25,9 +25,9 @@ typedef NS_ENUM(NSInteger,FLAudioRecoderStatus){
 };
 
 typedef NS_ENUM(NSInteger,FLAudioPlayerStatus){
-    Player_Playing,
-    Player_Pausing,
-    Player_Stoping
+    Player_Playing,// 正在播放
+    Player_Pausing,//暂停播放
+    Player_Stoping// 停止播放
 };
 
 @interface FLAudioRecorder : NSObject
@@ -84,7 +84,7 @@ typedef NS_ENUM(NSInteger,FLAudioPlayerStatus){
 /*
  *  BY gitKong
  *
- *  开始录音，录音前必须先调用 fl_prepareToRecord 
+ *  开始录音，注意，stop后需要重新调用fl_prepareToRecord 
  */
 - (void)fl_start:(void(^)())complete;
 /*
@@ -133,10 +133,12 @@ typedef NS_ENUM(NSInteger,FLAudioPlayerStatus){
  *
  *  出现错误会执行,注意：耳机拔出也会调用
  *
- *  code    1000：耳机拔出
-            1001：初始化播放器信息失败 
-            1002：不能正常播放到结束位置 
-            1003：进入后台
+ *  code     1000：耳机拔出
+                1001：播放器不能播放当前URL
+                1002：不能正常播放到结束位置
+                1003：进入后台
+                1004:  播放器未初始化
+                1005:  未知错误
  */
 - (void)fl_audioPlayer:(FLAudioPlayer *)audioPlayer didFailureWithError:(NSError *)error;
 

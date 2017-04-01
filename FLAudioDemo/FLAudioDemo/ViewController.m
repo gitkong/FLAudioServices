@@ -128,6 +128,9 @@ static int playMaxCount = 2;
         // app 进入后台，应该暂停
         [audioPlayer fl_pause:nil];
     }
+    else if (error.code == 1004){
+        NSLog(@"error.description = %@",error.description);
+    }
     else{
         // 其他错误应该stop
         

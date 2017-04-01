@@ -131,7 +131,7 @@
 				TargetAttributes = {
 					115151001E27158F000DC167 = {
 						CreatedOnToolsVersion = 8.1;
-						DevelopmentTeam = N9D9Y52FAG;
+						DevelopmentTeam = 9V8CFFRYD9;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -295,7 +295,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				DEVELOPMENT_TEAM = N9D9Y52FAG;
+				DEVELOPMENT_TEAM = 9V8CFFRYD9;
 				INFOPLIST_FILE = FLAudioDemo/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 8.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
@@ -308,7 +308,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				DEVELOPMENT_TEAM = N9D9Y52FAG;
+				DEVELOPMENT_TEAM = 9V8CFFRYD9;
 				INFOPLIST_FILE = FLAudioDemo/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 8.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";

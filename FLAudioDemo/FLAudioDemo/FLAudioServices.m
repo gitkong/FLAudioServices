@@ -8,6 +8,13 @@
 
 #import "FLAudioServices.h"
 @import UIKit;
+#define FLSuppressPerformSelectorLeakWarning(Stuff) \
+do { \
+_Pragma("clang diagnostic push") \
+_Pragma("clang diagnostic ignored \"-Warc-performSelector-leaks\"") \
+Stuff; \
+_Pragma("clang diagnostic pop") \
+} while (0)
 
 @interface FLAudioRecorder ()<AVAudioRecorderDelegate>
 @property (nonatomic,strong)AVAudioRecorder *recoder;
@@ -211,12 +218,13 @@ BOOL fl_isNetUrl(NSString *urlString){
     if (self.player) {
         [self.player play];
         self.fl_playerStatus = Player_Playing;
-        if (self.delegate && [self.delegate respondsToSelector:@selector(fl_audioPlayer:beginPlayingWithTotalTime:)]) {
-            [self.delegate fl_audioPlayer:self beginPlayingWithTotalTime:self.totalTime];
-        }
+        [self fl_delegateResponseToSelector:@selector(fl_audioPlayer:beginPlayingWithTotalTime:) withObject:@(self.totalTime) complete:nil];
         if (complete) {
             complete();
         }
+    }
+    else{
+        [self fl_delegateResponseToSelector:@selector(fl_audioPlayer:didFailureWithError:) withObject:[self fl_errorWithCode:1004] complete:nil];
     }
 }
 
@@ -227,6 +235,11 @@ BOOL fl_isNetUrl(NSString *urlString){
         self.fl_playerStatus = Player_Pausing;
         if (complete) {
             complete();
+        }
+    }
+    else{
+        if (self.delegate && [self.delegate respondsToSelector:@selector(fl_audioPlayer:didFailureWithError:)]) {
+            [self.delegate fl_audioPlayer:self didFailureWithError:[self fl_errorWithCode:1004]];
         }
     }
 }
@@ -242,6 +255,11 @@ BOOL fl_isNetUrl(NSString *urlString){
             }
         }];
     }
+    else{
+        if (self.delegate && [self.delegate respondsToSelector:@selector(fl_audioPlayer:didFailureWithError:)]) {
+            [self.delegate fl_audioPlayer:self didFailureWithError:[self fl_errorWithCode:1004]];
+        }
+    }
 }
 
 - (void)fl_seekToProgress:(CGFloat)progress complete:(void (^)(BOOL))complete{
@@ -249,20 +267,18 @@ BOOL fl_isNetUrl(NSString *urlString){
 }
 
 - (void)fl_seekToProgress:(CGFloat)progress andStartImmediately:(BOOL)startImmediately complete:(void (^)(BOOL finished))complete{
-    if (progress > 1.0) {
-        progress = 1.0;
-    }
-    if (progress < 0) {
-        progress = 0;
-    }
-    double time = progress * self.totalTime;
+    double time = FL_SAVE_PROGRESS(progress) * self.totalTime;
     
     if (self.player) {
         if (self.fl_playerStatus == Player_Playing) {
             [self fl_pause:nil];
         }
-        
         [self fl_seek:self.player toTime:time andStartImmediately:startImmediately complete:complete];
+    }
+    else{
+        if (self.delegate && [self.delegate respondsToSelector:@selector(fl_audioPlayer:didFailureWithError:)]) {
+            [self.delegate fl_audioPlayer:self didFailureWithError:[self fl_errorWithCode:1004]];
+        }
     }
 }
 
@@ -329,14 +345,8 @@ BOOL fl_isNetUrl(NSString *urlString){
     self.timeObserver = [self.player addPeriodicTimeObserverForInterval:CMTimeMake(1, 1) queue:dispatch_get_main_queue() usingBlock:^(CMTime time) {
         typeof(self) strongSelf = weakSelf;
         CGFloat progress = strongSelf.currentTime / strongSelf.totalTime;
-        if (progress > 1.0) {
-            progress = 1.0;
-        }
-        if (progress < 0) {
-            progress = 0;
-        }
         if (strongSelf.delegate && [strongSelf.delegate respondsToSelector:@selector(fl_audioPlayer:playingToCurrentProgress:withBufferProgress:)]) {
-            [strongSelf.delegate fl_audioPlayer:strongSelf playingToCurrentProgress:progress withBufferProgress:strongSelf.bufferProgress];
+            [strongSelf.delegate fl_audioPlayer:strongSelf playingToCurrentProgress:FL_SAVE_PROGRESS(progress) withBufferProgress:strongSelf.bufferProgress];
         }
     }];
 }
@@ -377,6 +387,7 @@ BOOL fl_isNetUrl(NSString *urlString){
     if (self.delegate && [self.delegate respondsToSelector:@selector(fl_audioPlayer:didFinishAndPlayNext:)]) {
         NSString __autoreleasing *nextUrl = nil;
         [self.delegate fl_audioPlayer:self didFinishAndPlayNext:&nextUrl];
+        
         if (nextUrl) {
             NSLog(@"自动播放下一条");
             [self fl_createPlayWithUrl:nextUrl andStartImmediately:YES];
@@ -390,8 +401,7 @@ BOOL fl_isNetUrl(NSString *urlString){
 
 - (void)didFailedToPlayToEndTime:(NSNotification *)notification{
     if (self.delegate && [self.delegate respondsToSelector:@selector(fl_audioPlayer:didFailureWithError:)]) {
-        NSError *error = [NSError errorWithDomain:@"FLAudioPlayerFailedToPlayToEndTime" code:1002 userInfo:@{NSLocalizedDescriptionKey:@"不能正常播放到结束位置"}];
-        [self.delegate fl_audioPlayer:self didFailureWithError:error];
+        [self.delegate fl_audioPlayer:self didFailureWithError:[self fl_errorWithCode:1002]];
     }
 }
 
@@ -414,8 +424,7 @@ BOOL fl_isNetUrl(NSString *urlString){
              */
         case AVAudioSessionRouteChangeReasonOldDeviceUnavailable:{
             if (self.delegate && [self.delegate respondsToSelector:@selector(fl_audioPlayer:didFailureWithError:)]) {
-                NSError *error = [NSError errorWithDomain:@"FLAudioPlayerRouteChangeReasonOldDeviceUnavailable" code:1000 userInfo:@{NSLocalizedDescriptionKey:@"耳机拔出"}];
-                [self.delegate fl_audioPlayer:self didFailureWithError:error];
+                [self.delegate fl_audioPlayer:self didFailureWithError:[self fl_errorWithCode:1000]];
             }
         }
             break;
@@ -427,8 +436,7 @@ BOOL fl_isNetUrl(NSString *urlString){
 
 - (void)applicationDidEnterBackground:(NSNotification *)notification{
     if (self.delegate && [self.delegate respondsToSelector:@selector(fl_audioPlayer:didFailureWithError:)]) {
-        NSError *error = [NSError errorWithDomain:@"FLAudioPlayerApplicationDidEnterBackground" code:1003 userInfo:@{NSLocalizedDescriptionKey:@"App 进入后台"}];
-        [self.delegate fl_audioPlayer:self didFailureWithError:error];
+        [self.delegate fl_audioPlayer:self didFailureWithError:[self fl_errorWithCode:1003]];
     }
 }
 
@@ -439,11 +447,13 @@ BOOL fl_isNetUrl(NSString *urlString){
         if(status == AVPlayerStatusReadyToPlay){
         }
         else if(status == AVPlayerStatusUnknown){
+            if (self.delegate && [self.delegate respondsToSelector:@selector(fl_audioPlayer:didFailureWithError:)]) {
+                [self.delegate fl_audioPlayer:self didFailureWithError:[self fl_errorWithCode:1005]];
+            }
         }
         else if (status == AVPlayerStatusFailed){
             if (self.delegate && [self.delegate respondsToSelector:@selector(fl_audioPlayer:didFailureWithError:)]) {
-                NSError *error = [NSError errorWithDomain:@"FLAudioPlayerStatusFailed" code:1001 userInfo:@{NSLocalizedDescriptionKey:@"初始化播放器信息失败"}];
-                [self.delegate fl_audioPlayer:self didFailureWithError:error];
+                [self.delegate fl_audioPlayer:self didFailureWithError:[self fl_errorWithCode:1001]];
             }
         }
     }
@@ -454,7 +464,7 @@ BOOL fl_isNetUrl(NSString *urlString){
         float durationSeconds = CMTimeGetSeconds(timeRange.duration);
         NSTimeInterval totalBuffer = startSeconds + durationSeconds;//缓冲总长度
         CGFloat bufferProgress = totalBuffer / self.totalTime;
-        self.bufferProgress = bufferProgress;
+        self.bufferProgress = FL_SAVE_PROGRESS(bufferProgress);
         NSLog(@"缓冲：%.2f",bufferProgress);
     }
     else if ([keyPath isEqualToString:@"playbackBufferEmpty"]){
@@ -467,6 +477,53 @@ BOOL fl_isNetUrl(NSString *urlString){
     }
 }
 
+CGFloat FL_SAVE_PROGRESS(CGFloat progress){
+    if (progress > 1.0) progress = 1.0;
+    if (progress < 0) progress = 0;
+    return progress;
+}
+
+
+- (void)fl_delegateResponseToSelector:(SEL)selector withObject:(id)object complete:(void(^)())complete{
+    if (self.delegate && [self.delegate respondsToSelector:selector]) {
+        FLSuppressPerformSelectorLeakWarning(
+            [self.delegate performSelector:selector withObject:self withObject:object];
+        );
+        if (complete) {
+            complete();
+        }
+    }
+}
+
+- (NSError *)fl_errorWithCode:(NSInteger)code{
+    NSString *description = @"";
+    switch (code - 1000) {
+        case 0:
+            description = @"播放出现错误，耳机拔出";
+            break;
+        case 1:
+            description = @"播放器不能播放当前URL";
+            break;
+        case 2:
+            description = @"播放器不能正常播放到结束位置";
+            break;
+        case 3:
+            description = @"播放器播放出现错误，应用进入后台";
+            break;
+        case 4:
+            description = @"播放器出现错误，播放器未初始化";
+            break;
+        case 5:
+            description = @"未知错误";
+            break;
+        default:
+            description = @"未知错误";
+            break;
+    }
+     NSError *error = [NSError errorWithDomain:description code:code userInfo:@{NSLocalizedDescriptionKey:description}];
+    
+    return error;
+}
 
 - (void)dealloc{
     [self fl_removeObserve];
@@ -494,14 +551,14 @@ NSString *fl_convertTime(CGFloat second){
 
 - (double)totalTime{
     if (self.player) {
-        return CMTimeGetSeconds(self.player.currentItem.asset.duration);
+        return CMTimeGetSeconds(self.player.currentItem.asset.duration) > 0.0f ? CMTimeGetSeconds(self.player.currentItem.asset.duration) : 0.0f;
     }
     return 0.0f;
 }
 
 - (double)currentTime{
     if (self.player) {
-        return CMTimeGetSeconds(self.player.currentItem.currentTime);
+        return CMTimeGetSeconds(self.player.currentItem.currentTime) > 0.0f ? CMTimeGetSeconds(self.player.currentItem.currentTime) : 0.0f;
     }
     return 0.0f;
 }
