@@ -12,8 +12,10 @@
 
 #import <Foundation/Foundation.h>
 @import AVFoundation;
-@import AudioToolbox;
 
+
+#define FL_COVERTTIME(second) (((NSString *)fl_convertTime(second)));
+NSString *fl_convertTime(CGFloat second);
 typedef NS_ENUM(NSInteger,FLAudioRecoderStatus){
     Recoder_NotPrepare,
     Recoder_Prepared,
@@ -76,7 +78,7 @@ typedef NS_ENUM(NSInteger,FLAudioPlayerStatus){
 /*
  *  BY gitKong
  *
- *  准备录音，设置参数后需要调用
+ *  准备录音，设置参数或者stop后需要重新调用
  */
 - (void)fl_prepareToRecord;
 /*
@@ -94,9 +96,49 @@ typedef NS_ENUM(NSInteger,FLAudioPlayerStatus){
 /*
  *  BY gitKong
  *
- *  结束录音，data 为录音数据
+ *  结束录音，url 为默认录音文件路径
  */
-- (void)fl_stop:(void(^)(NSData *data))complete;
+- (void)fl_stop:(void(^)(NSString *url))complete;
+
+@end
+
+@class FLAudioPlayer;
+@protocol FLAudioPlayerDelegate <NSObject>
+/*
+ *  BY gitKong
+ *
+ *  当开始播放时会调用，对应一个音频url只会调用一次
+ *
+ *  totalTime：总播放时间
+ */
+- (void)fl_audioPlayer:(FLAudioPlayer *)audioPlayer beginPlayingWithTotalTime:(double)totalTime;
+/*
+ *  BY gitKong
+ *
+ *  正在播放会调用，多次执行
+ *
+ *  progress：当前的播放进度 bufferProgress：当前的缓冲进度
+ */
+- (void)fl_audioPlayer:(FLAudioPlayer *)audioPlayer playingToCurrentProgress:(CGFloat)progress withBufferProgress:(CGFloat)bufferProgress;
+/*
+ *  BY gitKong
+ *
+ *  正常结束播放调用，对应一个音频url只会调用一次
+ *
+ *  nextUrl：就是下一条要播放的url，传入nil表示不自动不放下一条
+ */
+- (void)fl_audioPlayer:(FLAudioPlayer *)audioPlayer didFinishAndPlayNext:(NSString * __autoreleasing *)nextUrl;
+/*
+ *  BY gitKong
+ *
+ *  出现错误会执行,注意：耳机拔出也会调用
+ *
+ *  code    1000：耳机拔出
+            1001：初始化播放器信息失败 
+            1002：不能正常播放到结束位置 
+            1003：进入后台
+ */
+- (void)fl_audioPlayer:(FLAudioPlayer *)audioPlayer didFailureWithError:(NSError *)error;
 
 @end
 
@@ -105,13 +147,38 @@ typedef NS_ENUM(NSInteger,FLAudioPlayerStatus){
 /*
  *  BY gitKong
  *
- *  录音状态
+ *  播放状态
  */
 @property (nonatomic,assign,readonly)FLAudioPlayerStatus fl_playerStatus;
 /*
  *  BY gitKong
  *
- *  播放地址
+ *  播放总时间,自带转换字符串方法 利用宏 FL_COVERTTIME(second)
+ */
+@property (nonatomic,assign,readonly)double totalTime;
+/*
+ *  BY gitKong
+ *
+ *  当前播放时间,自带转换字符串方法 利用宏 FL_COVERTTIME(second)
+ */
+@property (nonatomic,assign,readonly)double currentTime;
+/*
+ *  BY gitKong
+ *
+ *  当前缓冲进度
+ */
+@property (nonatomic,assign,readonly)CGFloat bufferProgress;
+/*
+ *  BY gitKong
+ *
+ *  播放代理
+ */
+@property (nonatomic,weak)id<FLAudioPlayerDelegate> delegate;
+
+/*
+ *  BY gitKong
+ *
+ *  播放地址，可传入本地文件url或者网络文件url
  */
 - (instancetype)initWithUrl:(NSString *)urlString;
 /*
@@ -134,6 +201,14 @@ typedef NS_ENUM(NSInteger,FLAudioPlayerStatus){
  *  结束播放
  */
 - (void)fl_stop:(void(^)())complete;
+/*
+ *  BY gitKong
+ *
+ *  设置当前播放进度
+ */
+- (void)fl_seekToProgress:(CGFloat)progress complete:(void (^)(BOOL finished))complete;
+
+- (void)fl_seekToProgress:(CGFloat)progress andStartImmediately:(BOOL)startImmediately complete:(void (^)(BOOL finished))complete;
 
 @end
 

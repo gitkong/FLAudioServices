@@ -9,22 +9,19 @@
 /* Begin PBXBuildFile section */
 		110FE3521E7BF6A2007A2A3C /* FLAudioServices.m in Sources */ = {isa = PBXBuildFile; fileRef = 110FE3511E7BF6A2007A2A3C /* FLAudioServices.m */; };
 		111ECC461E383C3D0001A2B6 /* MP3Sample.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 111ECC451E383C3D0001A2B6 /* MP3Sample.mp3 */; };
-		1144E6041E2896BB00A9A9FB /* testView.m in Sources */ = {isa = PBXBuildFile; fileRef = 1144E6031E2896BB00A9A9FB /* testView.m */; };
 		115151061E27158F000DC167 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 115151051E27158F000DC167 /* main.m */; };
 		115151091E27158F000DC167 /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 115151081E27158F000DC167 /* AppDelegate.m */; };
 		1151510C1E27158F000DC167 /* ViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 1151510B1E27158F000DC167 /* ViewController.m */; };
 		1151510F1E27158F000DC167 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 1151510D1E27158F000DC167 /* Main.storyboard */; };
 		115151111E27158F000DC167 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 115151101E27158F000DC167 /* Assets.xcassets */; };
 		115151141E27158F000DC167 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 115151121E27158F000DC167 /* LaunchScreen.storyboard */; };
-		1151511D1E27473E000DC167 /* DemoViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 1151511C1E27473E000DC167 /* DemoViewController.m */; };
+		B678BA3C1E8CB6C400D925F2 /* FLSlider.m in Sources */ = {isa = PBXBuildFile; fileRef = B678BA3B1E8CB6C400D925F2 /* FLSlider.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		110FE3501E7BF6A2007A2A3C /* FLAudioServices.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = FLAudioServices.h; sourceTree = "<group>"; };
 		110FE3511E7BF6A2007A2A3C /* FLAudioServices.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = FLAudioServices.m; sourceTree = "<group>"; };
 		111ECC451E383C3D0001A2B6 /* MP3Sample.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = MP3Sample.mp3; sourceTree = "<group>"; };
-		1144E6021E2896BB00A9A9FB /* testView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = testView.h; sourceTree = "<group>"; };
-		1144E6031E2896BB00A9A9FB /* testView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = testView.m; sourceTree = "<group>"; };
 		115151011E27158F000DC167 /* FLAudioDemo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FLAudioDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		115151051E27158F000DC167 /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		115151071E27158F000DC167 /* AppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AppDelegate.h; sourceTree = "<group>"; };
@@ -35,8 +32,8 @@
 		115151101E27158F000DC167 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		115151131E27158F000DC167 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		115151151E27158F000DC167 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		1151511B1E27473E000DC167 /* DemoViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DemoViewController.h; sourceTree = "<group>"; };
-		1151511C1E27473E000DC167 /* DemoViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = DemoViewController.m; sourceTree = "<group>"; };
+		B678BA3A1E8CB6C400D925F2 /* FLSlider.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = FLSlider.h; sourceTree = "<group>"; };
+		B678BA3B1E8CB6C400D925F2 /* FLSlider.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = FLSlider.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -69,16 +66,13 @@
 		115151031E27158F000DC167 /* FLAudioDemo */ = {
 			isa = PBXGroup;
 			children = (
+				B678BA391E8CB6C400D925F2 /* FLSlider */,
 				115151071E27158F000DC167 /* AppDelegate.h */,
 				115151081E27158F000DC167 /* AppDelegate.m */,
 				1151510A1E27158F000DC167 /* ViewController.h */,
 				1151510B1E27158F000DC167 /* ViewController.m */,
 				110FE3501E7BF6A2007A2A3C /* FLAudioServices.h */,
 				110FE3511E7BF6A2007A2A3C /* FLAudioServices.m */,
-				1151511B1E27473E000DC167 /* DemoViewController.h */,
-				1151511C1E27473E000DC167 /* DemoViewController.m */,
-				1144E6021E2896BB00A9A9FB /* testView.h */,
-				1144E6031E2896BB00A9A9FB /* testView.m */,
 				1151510D1E27158F000DC167 /* Main.storyboard */,
 				115151101E27158F000DC167 /* Assets.xcassets */,
 				115151121E27158F000DC167 /* LaunchScreen.storyboard */,
@@ -95,6 +89,15 @@
 				115151051E27158F000DC167 /* main.m */,
 			);
 			name = "Supporting Files";
+			sourceTree = "<group>";
+		};
+		B678BA391E8CB6C400D925F2 /* FLSlider */ = {
+			isa = PBXGroup;
+			children = (
+				B678BA3A1E8CB6C400D925F2 /* FLSlider.h */,
+				B678BA3B1E8CB6C400D925F2 /* FLSlider.m */,
+			);
+			path = FLSlider;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -128,7 +131,7 @@
 				TargetAttributes = {
 					115151001E27158F000DC167 = {
 						CreatedOnToolsVersion = 8.1;
-						DevelopmentTeam = GB8FE8WWF8;
+						DevelopmentTeam = N9D9Y52FAG;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -172,10 +175,9 @@
 			files = (
 				1151510C1E27158F000DC167 /* ViewController.m in Sources */,
 				115151091E27158F000DC167 /* AppDelegate.m in Sources */,
+				B678BA3C1E8CB6C400D925F2 /* FLSlider.m in Sources */,
 				110FE3521E7BF6A2007A2A3C /* FLAudioServices.m in Sources */,
 				115151061E27158F000DC167 /* main.m in Sources */,
-				1144E6041E2896BB00A9A9FB /* testView.m in Sources */,
-				1151511D1E27473E000DC167 /* DemoViewController.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -293,7 +295,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				DEVELOPMENT_TEAM = GB8FE8WWF8;
+				DEVELOPMENT_TEAM = N9D9Y52FAG;
 				INFOPLIST_FILE = FLAudioDemo/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 8.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
@@ -306,7 +308,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				DEVELOPMENT_TEAM = GB8FE8WWF8;
+				DEVELOPMENT_TEAM = N9D9Y52FAG;
 				INFOPLIST_FILE = FLAudioDemo/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 8.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
