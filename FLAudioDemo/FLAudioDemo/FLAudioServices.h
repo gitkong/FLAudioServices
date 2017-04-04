@@ -29,6 +29,16 @@ typedef NS_ENUM(NSInteger,FLAudioPlayerStatus){
     Player_Pausing,//暂停播放
     Player_Stoping// 停止播放
 };
+@class FLAudioRecorder;
+@protocol FLAudioRecoderDelegate <NSObject>
+
+- (void)fl_audioRecoder:(FLAudioRecorder *)recoder beginRecodingWithUrl:(NSURL *)url;
+
+- (void)fl_audioRecoder:(FLAudioRecorder *)recoder recodingWithCurrentTime:(NSNumber *)currentTime;
+
+- (void)fl_audioRecoder:(FLAudioRecorder *)recoder finishRecodingWithTotalTime:(NSNumber *)totalTime;
+
+@end
 
 @interface FLAudioRecorder : NSObject
 /*
@@ -111,7 +121,7 @@ typedef NS_ENUM(NSInteger,FLAudioPlayerStatus){
  *
  *  totalTime：总播放时间
  */
-- (void)fl_audioPlayer:(FLAudioPlayer *)audioPlayer beginPlayingWithTotalTime:(double)totalTime;
+- (void)fl_audioPlayer:(FLAudioPlayer *)audioPlayer beginPlayingWithTotalTime:(NSNumber *)totalTime;
 /*
  *  BY gitKong
  *
@@ -119,13 +129,13 @@ typedef NS_ENUM(NSInteger,FLAudioPlayerStatus){
  *
  *  progress：当前的播放进度 bufferProgress：当前的缓冲进度
  */
-- (void)fl_audioPlayer:(FLAudioPlayer *)audioPlayer playingToCurrentProgress:(CGFloat)progress withBufferProgress:(CGFloat)bufferProgress;
+- (void)fl_audioPlayer:(FLAudioPlayer *)audioPlayer playingToCurrentProgress:(NSNumber *)progress withBufferProgress:(NSNumber *)bufferProgress;
 /*
  *  BY gitKong
  *
  *  正常结束播放调用，对应一个音频url只会调用一次
  *
- *  nextUrl：就是下一条要播放的url，传入nil表示不自动不放下一条
+ *  nextUrl：就是下一条要播放的url，传入nil表示不自动放下一条
  */
 - (void)fl_audioPlayer:(FLAudioPlayer *)audioPlayer didFinishAndPlayNext:(NSString * __autoreleasing *)nextUrl;
 /*
@@ -157,19 +167,19 @@ typedef NS_ENUM(NSInteger,FLAudioPlayerStatus){
  *
  *  播放总时间,自带转换字符串方法 利用宏 FL_COVERTTIME(second)
  */
-@property (nonatomic,assign,readonly)double totalTime;
+@property (nonatomic,strong,readonly)NSNumber *totalTime;
 /*
  *  BY gitKong
  *
  *  当前播放时间,自带转换字符串方法 利用宏 FL_COVERTTIME(second)
  */
-@property (nonatomic,assign,readonly)double currentTime;
+@property (nonatomic,strong,readonly)NSNumber *currentTime;
 /*
  *  BY gitKong
  *
  *  当前缓冲进度
  */
-@property (nonatomic,assign,readonly)CGFloat bufferProgress;
+@property (nonatomic,strong,readonly)NSNumber *bufferProgress;
 /*
  *  BY gitKong
  *

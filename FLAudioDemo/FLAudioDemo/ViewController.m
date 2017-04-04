@@ -49,27 +49,37 @@
         }];
     }
     else{
-        
-        [self.recoder fl_stop:^(NSString *url) {
-            typeof(self) strongSelf = weakSelf;
-            NSLog(@"stop");
-            strongSelf.recordTip.text = @"录音";
-            strongSelf.player = [[FLAudioPlayer alloc] initWithUrl:url];
-            strongSelf.player.delegate = strongSelf;
-            strongSelf.startLabel.text = FL_COVERTTIME(strongSelf.player.currentTime);
-            strongSelf.endLabel.text = FL_COVERTTIME(strongSelf.player.totalTime);
-        }];
+        [self.recoder fl_pause:nil];
+//        [self.recoder fl_stop:^(NSString *url) {
+//            typeof(self) strongSelf = weakSelf;
+//            NSLog(@"stop");
+//            strongSelf.recordTip.text = @"录音";
+//            strongSelf.player = [[FLAudioPlayer alloc] initWithUrl:url];
+//            strongSelf.player.delegate = strongSelf;
+//            strongSelf.startLabel.text = FL_COVERTTIME(strongSelf.player.currentTime.doubleValue);
+//            strongSelf.endLabel.text = FL_COVERTTIME(strongSelf.player.totalTime.doubleValue);
+//        }];
     }
 }
 
 - (IBAction)clickToPlay:(id)sender {
     __weak typeof(self) weakSelf = self;
     if (self.playSwitch.on) {
+        [self.recoder fl_stop:^(NSString *url) {
+            typeof(self) strongSelf = weakSelf;
+            NSLog(@"stop");
+            strongSelf.recordTip.text = @"录音";
+            strongSelf.player = [[FLAudioPlayer alloc] initWithUrl:url];
+            strongSelf.player.delegate = strongSelf;
+            strongSelf.startLabel.text = FL_COVERTTIME(strongSelf.player.currentTime.doubleValue);
+            strongSelf.endLabel.text = FL_COVERTTIME(strongSelf.player.totalTime.doubleValue);
+        }];
+        
         [self.player fl_start:^{
             typeof(self) strongSelf = weakSelf;
             strongSelf.playTip.text = @"正在播放...";
-            strongSelf.startLabel.text = FL_COVERTTIME(strongSelf.player.currentTime);
-            strongSelf.endLabel.text = FL_COVERTTIME(strongSelf.player.totalTime);
+            strongSelf.startLabel.text = FL_COVERTTIME(strongSelf.player.currentTime.doubleValue);
+            strongSelf.endLabel.text = FL_COVERTTIME(strongSelf.player.totalTime.doubleValue);
         }];
     }
     else{
@@ -88,14 +98,14 @@
 
 #pragma mark - audio player delegate
 
-- (void)fl_audioPlayer:(FLAudioPlayer *)audioPlayer beginPlayingWithTotalTime:(double)totalTime{
-    self.endLabel.text = FL_COVERTTIME(totalTime);
+- (void)fl_audioPlayer:(FLAudioPlayer *)audioPlayer beginPlayingWithTotalTime:(NSNumber *)totalTime{
+    self.endLabel.text = FL_COVERTTIME(totalTime.doubleValue);
 }
 
-- (void)fl_audioPlayer:(FLAudioPlayer *)audioPlayer playingToCurrentProgress:(CGFloat)progress withBufferProgress:(CGFloat)bufferProgress{
-    self.fl_slider.value = progress;
-    self.fl_slider.cacheValue = bufferProgress;
-    self.startLabel.text = FL_COVERTTIME(self.player.totalTime * progress);
+- (void)fl_audioPlayer:(FLAudioPlayer *)audioPlayer playingToCurrentProgress:(NSNumber *)progress withBufferProgress:(NSNumber *)bufferProgress{
+    self.fl_slider.value = progress.floatValue;
+    self.fl_slider.cacheValue = bufferProgress.floatValue;
+    self.startLabel.text = FL_COVERTTIME(self.player.totalTime.doubleValue * progress.doubleValue);
 }
 /*
  *  BY gitKong
@@ -144,11 +154,11 @@ static int playMaxCount = 2;
 #pragma mark - slider delegate
 
 - (void)beginSlide:(FLSliderButton *)sliderBtn slider:(FLSlider *)slider{
-    self.startLabel.text = FL_COVERTTIME(self.player.totalTime * slider.value);
+    self.startLabel.text = FL_COVERTTIME(self.player.totalTime.doubleValue * slider.value);
 }
 
 - (void)sliding:(FLSliderButton *)sliderBtn slider:(FLSlider *)slider{
-    self.startLabel.text = FL_COVERTTIME(self.player.totalTime * slider.value);
+    self.startLabel.text = FL_COVERTTIME(self.player.totalTime.doubleValue * slider.value);
 }
 
 - (void)endSlide:(FLSliderButton *)sliderBtn slider:(FLSlider *)slider{
