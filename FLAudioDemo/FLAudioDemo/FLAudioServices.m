@@ -8,6 +8,7 @@
 
 #import "FLAudioServices.h"
 @import UIKit;
+@import MediaPlayer;
 #define FLSuppressPerformSelectorLeakWarning(Stuff) \
 do { \
 _Pragma("clang diagnostic push") \
@@ -16,9 +17,15 @@ Stuff; \
 _Pragma("clang diagnostic pop") \
 } while (0)
 
+typedef NS_ENUM(NSUInteger, FLAudioRecorderErrorCode) {
+    FLAudioRecorderErrorByRecoderIsNotInit = 1000
+};
+
 @interface FLAudioRecorder ()<AVAudioRecorderDelegate>
 @property (nonatomic,strong)AVAudioRecorder *recoder;
-@property (nonatomic,assign)FLAudioRecoderStatus fl_recorderStatus;
+@property (nonatomic,assign)FLAudioRecoderStatus recorderStatus;
+@property (nonatomic,strong)NSTimer *recordTimer;
+@property (nonatomic,strong)dispatch_source_t timer;
 @end
 
 @implementation FLAudioRecorder
@@ -36,12 +43,10 @@ _Pragma("clang diagnostic pop") \
     [self fl_default];
     switch ([AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeAudio]) {
         case AVAuthorizationStatusAuthorized:{
-            // already authorize,init capture session
             [self fl_createAudioRecorder:YES];
             break;
         }
         case AVAuthorizationStatusNotDetermined:{
-            // waiting user to authorize
             [AVCaptureDevice requestAccessForMediaType:AVMediaTypeAudio completionHandler:^(BOOL granted) {
                 if (granted) {
                     [self fl_createAudioRecorder:YES];
@@ -60,12 +65,18 @@ _Pragma("clang diagnostic pop") \
 
 - (void)fl_prepareToRecord{
     if (self.recoder) {
+//        if (self.recorderStatus != Recoder_Stoping) {
+//            [self fl_stop:nil];
+//        }
         if ([self.recoder prepareToRecord]) {
-            self.fl_recorderStatus = Recoder_Prepared;
+            self.recorderStatus = Recoder_Prepared;
         }
         else{
-            self.fl_recorderStatus = Recoder_NotPrepare;
+            self.recorderStatus = Recoder_NotPrepare;
         }
+    }
+    else{
+        [self fl_delegateResponseFailureWithCode:FLAudioRecorderErrorByRecoderIsNotInit];
     }
 }
 
@@ -84,8 +95,11 @@ _Pragma("clang diagnostic pop") \
     self.recoder = [[AVAudioRecorder alloc] initWithURL:[NSURL fileURLWithPath:[self fl_filePath]] settings:[self fl_recorderSetting] error:&error];
     if (error) {
         NSLog(@"Error: %@", [error localizedDescription]);
+        [self fl_delegateResponseFailureWithCode:FLAudioRecorderErrorByRecoderIsNotInit];
         return;
     }
+    
+    [self fl_createTimer];
     
     self.recoder.delegate = self;
     // 开启音量检测
@@ -95,23 +109,80 @@ _Pragma("clang diagnostic pop") \
     }
 }
 
-#warning TODO 要移除prepare，太麻烦了
 - (void)fl_start:(void(^)())complete{
-    if (self.recoder && !self.recoder.isRecording && self.fl_recorderStatus == Recoder_Prepared) {
+    if (!self.recoder) {
+        [self fl_delegateResponseFailureWithCode:FLAudioRecorderErrorByRecoderIsNotInit];
+        return;
+    }
+    if (!self.recoder.isRecording && (self.recorderStatus == Recoder_Prepared || self.recorderStatus == Recoder_Pausing)) {
         [self.recoder record];
+        // 开启定时器
+        [self fl_fireTimer];
         if (complete) {
             complete();
         }
     }
-    else{
-        NSLog(@"请先 prepare");
+}
+
+- (void)fl_createTimer{
+    // 创建定时器对象
+    self.timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, dispatch_get_main_queue());
+    // 设置时间间隔
+    dispatch_source_set_timer(self.timer, DISPATCH_TIME_NOW, 0.01 * NSEC_PER_SEC, 0);
+    // 定时器回调
+    __weak typeof(self) weakSelf = self;
+    dispatch_source_set_event_handler(self.timer, ^{
+        typeof(self) strongSelf = weakSelf;
+        FL_DELEGATE_RESPONSE(strongSelf.delegate, @selector(fl_audioRecoder:recodingWithCurrentTime:), @[strongSelf,@(count++ / 100)], nil);
+    });
+    
+}
+// 内部计数器
+static CGFloat count = 0;
+static BOOL suspended = YES;
+
+- (void)fl_fireTimer{
+    if (!self.timer) {
+        return;
+    }
+    if (suspended) {
+        dispatch_resume(self.timer);
+        suspended = NO;
     }
 }
 
+- (void)fl_pauseTimer{
+    if (!self.timer) {
+        return;
+    }
+    if (!suspended) {
+        dispatch_suspend(self.timer);
+        suspended = YES;
+    }
+}
+
+- (void)fl_stopTimer{
+    if (!self.timer) {
+        return;
+    }
+    // 重置计数器
+    count = 0;
+    if (!suspended) {
+        dispatch_suspend(self.timer);
+        suspended = YES;
+    }
+    
+}
+
 - (void)fl_pause:(void(^)())complete{
-    if (self.recoder && self.recoder.isRecording) {
+    if (!self.recoder) {
+        [self fl_delegateResponseFailureWithCode:FLAudioRecorderErrorByRecoderIsNotInit];
+        return;
+    }
+    if (self.recoder.isRecording) {
         [self.recoder pause];
-        self.fl_recorderStatus = Recoder_Pausing;
+        [self fl_pauseTimer];
+        self.recorderStatus = Recoder_Pausing;
         if (complete) {
             complete();
         }
@@ -121,17 +192,21 @@ _Pragma("clang diagnostic pop") \
 - (void)fl_stop:(void(^)(NSString *url))complete{
     if (self.recoder) {
         [self.recoder stop];
-        self.fl_recorderStatus = Recoder_Stoping;
+        [self fl_stopTimer];
+        self.recorderStatus = Recoder_Stoping;
         if (complete) {
             complete([self fl_filePath]);
         }
+    }
+    else{
+        [self fl_delegateResponseFailureWithCode:FLAudioRecorderErrorByRecoderIsNotInit];
     }
 }
 
 - (void)dealloc{
     if (self.recoder) {
         [self.recoder stop];
-        self.fl_recorderStatus = Recoder_Stoping;
+        self.recorderStatus = Recoder_Stoping;
         self.recoder = nil;
     }
 }
@@ -143,35 +218,45 @@ _Pragma("clang diagnostic pop") \
         return self.recoder.isRecording;
     }
     else{
+        [self fl_delegateResponseFailureWithCode:FLAudioRecorderErrorByRecoderIsNotInit];
         return NO;
     }
 }
 
 #pragma mark -- AVAudioRecorderDelegate
 - (void)audioRecorderDidFinishRecording:(AVAudioRecorder *)recorder successfully:(BOOL)flag{
-    NSLog(@"record did finished");
+    if (flag) {
+        NSLog(@"record did finished");
+    }
+    else{
+        // 编码错误
+    }
+}
+
+- (void)audioRecorderEncodeErrorDidOccur:(AVAudioRecorder *)recorder error:(NSError *)error{
+    // 编码错误
 }
 
 #pragma mark -- private method
 
 - (void)fl_default{
-    self.fl_audioFromatId = kAudioFormatAppleIMA4;
-    self.fl_sampleRate = 44100.0f;
-    self.fl_channels = 2;
-    self.fl_bitDepthHint = 16;
-    self.fl_bitRate = 128000;
-    self.fl_audioQuality = AVAudioQualityHigh;
-    self.fl_recorderStatus = Recoder_NotPrepare;
+    self.audioFromatId = kAudioFormatAppleIMA4;
+    self.sampleRate = 44100.0f;
+    self.channels = 2;
+    self.bitDepthHint = 16;
+    self.bitRate = 128000;
+    self.audioQuality = AVAudioQualityHigh;
+    self.recorderStatus = Recoder_NotPrepare;
 }
 
 - (NSDictionary *)fl_recorderSetting{
     return @{
-             AVFormatIDKey : @(self.fl_audioFromatId),
-             AVSampleRateKey : @(self.fl_sampleRate),
-             AVNumberOfChannelsKey : @(self.fl_channels),
-             AVEncoderBitDepthHintKey : @(self.fl_bitDepthHint),
-             AVEncoderAudioQualityKey : @(self.fl_audioQuality),
-             AVEncoderBitRateKey:@(self.fl_bitRate)
+             AVFormatIDKey : @(self.audioFromatId),
+             AVSampleRateKey : @(self.sampleRate),
+             AVNumberOfChannelsKey : @(self.channels),
+             AVEncoderBitDepthHintKey : @(self.bitDepthHint),
+             AVEncoderAudioQualityKey : @(self.audioQuality),
+             AVEncoderBitRateKey:@(self.bitRate)
              };
 }
 
@@ -181,32 +266,112 @@ _Pragma("clang diagnostic pop") \
     return [path stringByAppendingPathComponent:@"gitKong.caf"];
 }
 
-/**
- *  @author gitKong
- *
- *  show tip for user auth
- */
 - (void)fl_showAuthTip{
     UIAlertView *alert = [[UIAlertView alloc] initWithTitle:@"温馨提示" message:@"您还没开启授权麦克风，请打开--> 设置 -- > 隐私 --> 通用等权限设置" delegate:nil cancelButtonTitle:@"OK" otherButtonTitles: nil];
     [alert show];
 }
 
+
+- (void)fl_delegateResponseToSelector:(SEL)selector withObject:(NSArray<id> *)objects complete:(void(^)())complete{
+    FL_DELEGATE_RESPONSE(self.delegate, selector, objects, complete);
+}
+
+- (void)fl_delegateResponseFailureWithCode:(FLAudioRecorderErrorCode)errorCode{
+    [self fl_delegateResponseToSelector:@selector(fl_audioRecoder:didFailureWithError:) withObject:@[self,[self fl_errorWithCode:errorCode]] complete:nil];
+}
+
+- (NSError *)fl_errorWithCode:(NSInteger)code{
+    NSString *description = @"";
+    switch (code - 1000) {
+        case 0:
+            description = @"播放出现错误，耳机拔出";
+            break;
+        case 1:
+            description = @"播放器不能播放当前URL";
+            break;
+        case 2:
+            description = @"播放器不能正常播放到结束位置";
+            break;
+        case 3:
+            description = @"播放器播放出现错误，应用进入后台";
+            break;
+        case 4:
+            description = @"播放器出现错误，播放器未初始化";
+            break;
+        case 5:
+            description = @"未知错误";
+            break;
+        default:
+            description = @"未知错误";
+            break;
+    }
+    NSError *error = [NSError errorWithDomain:description code:code userInfo:@{NSLocalizedDescriptionKey:description}];
+    
+    return error;
+}
+
+void FL_DELEGATE_RESPONSE(id delegate,SEL selector,NSArray<id> * objects,void(^complete)()){
+    if (delegate && [delegate respondsToSelector:selector]) {
+        FLSuppressPerformSelectorLeakWarning(
+                                             FL_PERFORM_SELECTOR(delegate, selector, objects);
+                                             );
+        if (complete) {
+            complete();
+        }
+    }
+}
+
+id FL_PERFORM_SELECTOR(id target,SEL selector,NSArray <id>* objects){
+    // 获取方法签名
+    NSMethodSignature *sig = [target methodSignatureForSelector:selector];
+    if (sig){
+        NSInvocation* invo = [NSInvocation invocationWithMethodSignature:sig];
+        [invo setTarget:target];
+        [invo setSelector:selector];
+        for (NSInteger index = 0; index < objects.count; index ++) {
+            id object = objects[index];
+            // 参数从下标2开始
+            [invo setArgument:&object atIndex:index + 2];
+        }
+        [invo invoke];
+        if (sig.methodReturnLength) {
+            id anObject;
+            [invo getReturnValue:&anObject];
+            return anObject;
+        }
+        else {
+            return nil;
+        }
+    }
+    else {
+        return nil;
+    }
+}
+
+#pragma mark - setter & getter
+
 @end
 
+typedef NS_ENUM(NSUInteger, FLAudioPlayerErrorCode) {
+    FLAudioPlayerErrorByDeviceUnavailable = 1000,
+    FLAudioPlayerErrorByPlayerStatusFailed,
+    FLAudioPlayerErrorByFailureToPlayToEnd,
+    FLAudioPlayerErrorByEnterBackground,
+    FLAudioPlayerErrorByPlayerIsNotInit,
+    FLAudioPlayerErrorByUnknow
+};
 
 @interface FLAudioPlayer ()
 @property (strong, nonatomic) AVPlayer *player;
-@property (nonatomic,assign)FLAudioPlayerStatus fl_playerStatus;
+@property (nonatomic,assign)FLAudioPlayerStatus playerStatus;
 @property (nonatomic,strong)id timeObserver;
 @property (nonatomic,strong)NSNumber *bufferProgress;
-
+@property (nonatomic,strong)NSNumber *totalTime;
+@property (nonatomic,strong)NSNumber *currentTime;
+@property (nonatomic,strong)UISlider *volumSlider;
 @end
 
 @implementation FLAudioPlayer
-
-BOOL fl_isNetUrl(NSString *urlString){
-    return [[urlString substringToIndex:4] caseInsensitiveCompare:@"http"] == NSOrderedSame || [[urlString substringToIndex:5] caseInsensitiveCompare:@"https"] == NSOrderedSame;
-}
 
 - (instancetype)initWithUrl:(NSString *)urlString{
     if (self = [super init]) {
@@ -218,36 +383,34 @@ BOOL fl_isNetUrl(NSString *urlString){
 - (void)fl_start:(void(^)())complete{
     if (self.player) {
         [self.player play];
-        self.fl_playerStatus = Player_Playing;
+        self.playerStatus = Player_Playing;
         [self fl_delegateResponseToSelector:@selector(fl_audioPlayer:beginPlayingWithTotalTime:) withObject:@[self,self.totalTime] complete:nil];
         if (complete) {
             complete();
         }
     }
     else{
-        [self fl_delegateResponseToSelector:@selector(fl_audioPlayer:didFailureWithError:) withObject:@[self,[self fl_errorWithCode:1004]] complete:nil];
+        [self fl_delegateResponseFailureWithCode:FLAudioPlayerErrorByPlayerIsNotInit];
     }
 }
-
 
 - (void)fl_pause:(void(^)())complete{
     if (self.player) {
         [self.player pause];
-        self.fl_playerStatus = Player_Pausing;
+        self.playerStatus = Player_Pausing;
         if (complete) {
             complete();
         }
     }
     else{
-        [self fl_delegateResponseToSelector:@selector(fl_audioPlayer:didFailureWithError:) withObject:@[self,[self fl_errorWithCode:1004]] complete:nil];
+        [self fl_delegateResponseFailureWithCode:FLAudioPlayerErrorByPlayerIsNotInit];
     }
 }
-
 
 - (void)fl_stop:(void(^)())complete{
     if (self.player) {
         [self.player pause];
-        self.fl_playerStatus = Player_Stoping;
+        self.playerStatus = Player_Stoping;
         [self fl_seek:self.player toTime:0 andStartImmediately:NO complete:^(BOOL finished) {
             if (complete) {
                 complete();
@@ -255,7 +418,7 @@ BOOL fl_isNetUrl(NSString *urlString){
         }];
     }
     else{
-        [self fl_delegateResponseToSelector:@selector(fl_audioPlayer:didFailureWithError:) withObject:@[self,[self fl_errorWithCode:1004]] complete:nil];
+        [self fl_delegateResponseFailureWithCode:FLAudioPlayerErrorByPlayerIsNotInit];
     }
 }
 
@@ -267,13 +430,13 @@ BOOL fl_isNetUrl(NSString *urlString){
     double time = FL_SAVE_PROGRESS(progress) * self.totalTime.doubleValue;
     
     if (self.player) {
-        if (self.fl_playerStatus == Player_Playing) {
+        if (self.playerStatus == Player_Playing) {
             [self fl_pause:nil];
         }
         [self fl_seek:self.player toTime:time andStartImmediately:startImmediately complete:complete];
     }
     else{
-        [self fl_delegateResponseToSelector:@selector(fl_audioPlayer:didFailureWithError:) withObject:@[self,[self fl_errorWithCode:1004]] complete:nil];
+        [self fl_delegateResponseFailureWithCode:FLAudioPlayerErrorByPlayerIsNotInit];
     }
 }
 
@@ -282,7 +445,7 @@ BOOL fl_isNetUrl(NSString *urlString){
 
 - (NSURL *)fl_getSuitableUrl:(NSString *)urlString{
     NSURL *url = nil;
-    if (fl_isNetUrl(urlString)) {
+    if (FL_ISNETURL(urlString)) {
         url = [NSURL URLWithString:urlString];
     }
     else{
@@ -303,6 +466,7 @@ BOOL fl_isNetUrl(NSString *urlString){
         [self.player replaceCurrentItemWithPlayerItem:item];
     }
     [self fl_addObserve];
+    self.playerStatus = Player_Stoping;
     if (startImmediately) {
         [self fl_start:nil];
     }
@@ -362,10 +526,15 @@ BOOL fl_isNetUrl(NSString *urlString){
     [playerItem removeObserver:self forKeyPath:@"playbackLikelyToKeepUp"];
 }
 
-- (void)fl_removeObserve{
-    // reset currentBufferProgress
+- (void)fl_resetDefault{
     self.bufferProgress = @0.0f;
-    
+    self.currentTime = @0.0f;
+    self.totalTime = @0.0f;
+    self.playerStatus = Player_Stoping;
+}
+
+- (void)fl_removeObserve{
+    self.bufferProgress = @0.0f;
     if (self.player) {
         if (self.timeObserver) {
             [self.player removeTimeObserver:self.timeObserver];
@@ -373,60 +542,44 @@ BOOL fl_isNetUrl(NSString *urlString){
         [self fl_removeObserverFromPlayerItem:self.player.currentItem];
     }
     [[NSNotificationCenter defaultCenter] removeObserver:self];
-    
 }
 
 - (void)didFinishPlay:(NSNotification *)notification{
-//    NSString  *nextUrl = nil;
-//    @[&nextUrl];
     if (self.delegate && [self.delegate respondsToSelector:@selector(fl_audioPlayer:didFinishAndPlayNext:)]) {
         NSString __autoreleasing *nextUrl = nil;
         [self.delegate fl_audioPlayer:self didFinishAndPlayNext:&nextUrl];
-        
         if (nextUrl) {
-            NSLog(@"自动播放下一条");
             [self fl_createPlayWithUrl:nextUrl andStartImmediately:YES];
         }
         else{
             [self fl_stop:nil];
-            NSLog(@"停止了");
         }
     }
 }
 
 - (void)didFailedToPlayToEndTime:(NSNotification *)notification{
-    [self fl_delegateResponseToSelector:@selector(fl_audioPlayer:didFailureWithError:) withObject:@[[self fl_errorWithCode:1002]] complete:nil];
+    [self fl_delegateResponseFailureWithCode:FLAudioPlayerErrorByFailureToPlayToEnd];
 }
 
 - (void)audioRouteChange:(NSNotification*)notification{
     NSDictionary *interuptionDict = notification.userInfo;
     NSInteger routeChangeReason = [[interuptionDict valueForKey:AVAudioSessionRouteChangeReasonKey] integerValue];
     switch (routeChangeReason) {
-            /*
-             *  BY gitKong
-             *
-             *  耳机插入
-             */
         case AVAudioSessionRouteChangeReasonNewDeviceAvailable:
-            
+            //耳机插入
             break;
-            /*
-             *  BY gitKong
-             *
-             *  耳机拔出
-             */
         case AVAudioSessionRouteChangeReasonOldDeviceUnavailable:{
-            [self fl_delegateResponseToSelector:@selector(fl_audioPlayer:didFailureWithError:) withObject:@[self,[self fl_errorWithCode:1000]] complete:nil];
+            //耳机拔出
+            [self fl_delegateResponseFailureWithCode:FLAudioPlayerErrorByDeviceUnavailable];
         }
             break;
-            
         case AVAudioSessionRouteChangeReasonCategoryChange:
             break;
     }
 }
 
 - (void)applicationDidEnterBackground:(NSNotification *)notification{
-     [self fl_delegateResponseToSelector:@selector(fl_audioPlayer:didFailureWithError:) withObject:@[self,[self fl_errorWithCode:1003]] complete:nil];
+    [self fl_delegateResponseFailureWithCode:FLAudioPlayerErrorByEnterBackground];
 }
 
 - (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context{
@@ -436,139 +589,37 @@ BOOL fl_isNetUrl(NSString *urlString){
         if(status == AVPlayerStatusReadyToPlay){
         }
         else if(status == AVPlayerStatusUnknown){
-            if (self.delegate && [self.delegate respondsToSelector:@selector(fl_audioPlayer:didFailureWithError:)]) {
-                [self.delegate fl_audioPlayer:self didFailureWithError:[self fl_errorWithCode:1005]];
-            }
+            [self fl_delegateResponseFailureWithCode:FLAudioPlayerErrorByUnknow];
         }
         else if (status == AVPlayerStatusFailed){
-            if (self.delegate && [self.delegate respondsToSelector:@selector(fl_audioPlayer:didFailureWithError:)]) {
-                [self.delegate fl_audioPlayer:self didFailureWithError:[self fl_errorWithCode:1001]];
-            }
+            [self fl_delegateResponseFailureWithCode:FLAudioPlayerErrorByPlayerStatusFailed];
         }
     }
     else if([keyPath isEqualToString:@"loadedTimeRanges"]){
         NSArray *array = playerItem.loadedTimeRanges;
-        CMTimeRange timeRange = [array.firstObject CMTimeRangeValue];//本次缓冲时间范围
+        //本次缓冲时间范围
+        CMTimeRange timeRange = [array.firstObject CMTimeRangeValue];
         float startSeconds = CMTimeGetSeconds(timeRange.start);
         float durationSeconds = CMTimeGetSeconds(timeRange.duration);
-        NSTimeInterval totalBuffer = startSeconds + durationSeconds;//缓冲总长度
+        //缓冲总长度
+        NSTimeInterval totalBuffer = startSeconds + durationSeconds;
         CGFloat bufferProgress = totalBuffer / self.totalTime.doubleValue;
         self.bufferProgress = @(FL_SAVE_PROGRESS(bufferProgress));
-        NSLog(@"缓冲：%.2f",bufferProgress);
     }
     else if ([keyPath isEqualToString:@"playbackBufferEmpty"]){
-        NSLog(@"playbackBufferEmpty");
         self.bufferProgress = @0.0f;
     }
     else if ([keyPath isEqualToString:@"playbackLikelyToKeepUp"]){
-        
-        NSLog(@"playbackLikelyToKeepUp");
     }
 }
-
-CGFloat FL_SAVE_PROGRESS(CGFloat progress){
-    if (progress > 1.0) progress = 1.0;
-    if (progress < 0) progress = 0;
-    return progress;
-}
-
-
 
 - (void)fl_delegateResponseToSelector:(SEL)selector withObject:(NSArray<id> *)objects complete:(void(^)())complete{
-    if (self.delegate && [self.delegate respondsToSelector:selector]) {
-        FLSuppressPerformSelectorLeakWarning(
-            FL_PERFORM_SELECTOR(self.delegate, selector, objects);
-        );
-        if (complete) {
-            complete();
-        }
-    }
+    FL_DELEGATE_RESPONSE(self.delegate, selector, objects, complete);
 }
 
-id FL_PERFORM_SELECTOR(id target,SEL selector,NSArray <id>* objects){
-    // 获取方法签名
-    NSMethodSignature *sig = [target methodSignatureForSelector:selector];
-    if (sig){
-        NSInvocation* invo = [NSInvocation invocationWithMethodSignature:sig];
-        [invo setTarget:target];
-        [invo setSelector:selector];
-        for (NSInteger index = 0; index < objects.count; index ++) {
-            id object = objects[index];
-            // 参数从下标2开始
-            [invo setArgument:&object atIndex:index + 2];
-        }
-        [invo invoke];
-        if (sig.methodReturnLength) {
-            id anObject;
-            [invo getReturnValue:&anObject];
-            return anObject;
-        }
-        else {
-            return nil;
-        }
-    }
-    else {
-        return nil;
-    }
+- (void)fl_delegateResponseFailureWithCode:(FLAudioPlayerErrorCode)errorCode{
+    [self fl_delegateResponseToSelector:@selector(fl_audioPlayer:didFailureWithError:) withObject:@[self,[self fl_errorWithCode:errorCode]] complete:nil];
 }
-
-- (id)fl_perform:(id)target selector:(SEL)selector withObjects:(NSArray <id>*)objects{
-    // 获取方法签名
-    NSMethodSignature *sig = [target methodSignatureForSelector:selector];
-    if (sig){
-        NSInvocation* invo = [NSInvocation invocationWithMethodSignature:sig];
-        [invo setTarget:target];
-        [invo setSelector:selector];
-        for (NSInteger index = 0; index < objects.count; index ++) {
-            id object = objects[index];
-            // 参数从下标2开始
-            [invo setArgument:&object atIndex:index + 2];
-        }
-        [invo invoke];
-        if (sig.methodReturnLength) {
-            id anObject;
-            [invo getReturnValue:&anObject];
-            return anObject;
-        }
-        else {
-            return nil;
-        }
-    }
-    else {
-        return nil;
-    }
-}
-
-//- (id)fl_perform:(id)target selector:(SEL)selector withObjects:(id)object,...{
-//    // 获取方法签名
-//    NSMethodSignature *sig = [self methodSignatureForSelector:selector];
-//    if (sig){
-//        NSInvocation* invo = [NSInvocation invocationWithMethodSignature:sig];
-//        [invo setTarget:target];
-//        [invo setSelector:selector];
-//        va_list list;
-//        va_start(list, object);
-//        id otherObject = nil;
-//        NSInteger index = 2;
-//        [invo setArgument:&object atIndex:index];
-//        while ((otherObject = va_arg(list, id))) {
-//            index ++;
-//            [invo setArgument:&otherObject atIndex:index];
-//        }
-//        [invo invoke];
-//        if (sig.methodReturnLength) {
-//            id anObject;
-//            [invo getReturnValue:&anObject];
-//            return anObject;
-//        }
-//        else {
-//            return nil;
-//        }
-//    }
-//    else {
-//        return nil;
-//    }
-//}
 
 - (NSError *)fl_errorWithCode:(NSInteger)code{
     NSString *description = @"";
@@ -604,14 +655,20 @@ id FL_PERFORM_SELECTOR(id target,SEL selector,NSArray <id>* objects){
     [self fl_removeObserve];
 }
 
-/*
- *  BY gitKong
- *
- *  保留
- */
-NSString *fl_convertTime(CGFloat second){
+BOOL FL_ISNETURL(NSString *urlString){
+    return [[urlString substringToIndex:4] caseInsensitiveCompare:@"http"] == NSOrderedSame || [[urlString substringToIndex:5] caseInsensitiveCompare:@"https"] == NSOrderedSame;
+}
+
+CGFloat FL_SAVE_PROGRESS(CGFloat progress){
+    if (progress > 1.0) progress = 1.0;
+    if (progress < 0) progress = 0;
+    return progress;
+}
+
+
+
+NSString *FL_COVERTTIME(CGFloat second){
     NSDate *date = [NSDate dateWithTimeIntervalSince1970:second];
-#warning TODO 优化formatter，影响性能
     NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
     if (second/3600 >= 1) {
         [formatter setDateFormat:@"HH:mm:ss"];
@@ -624,10 +681,19 @@ NSString *fl_convertTime(CGFloat second){
 
 #pragma mark - setter & getter
 
+- (void)setCurrentVolum:(CGFloat)currentVolum{
+    self.volumSlider.value = FL_SAVE_PROGRESS(currentVolum);
+}
+
+- (CGFloat)currentVolum{
+    return FL_SAVE_PROGRESS(self.volumSlider.value);
+}
+
 - (NSNumber *)totalTime{
     if (self.player) {
         return @(CMTimeGetSeconds(self.player.currentItem.asset.duration) > 0.0f ? CMTimeGetSeconds(self.player.currentItem.asset.duration) : 0.0f);
     }
+    [self fl_delegateResponseFailureWithCode:FLAudioPlayerErrorByPlayerIsNotInit];
     return @0.0f;
 }
 
@@ -635,9 +701,17 @@ NSString *fl_convertTime(CGFloat second){
     if (self.player) {
         return @(CMTimeGetSeconds(self.player.currentItem.currentTime) > 0.0f ? CMTimeGetSeconds(self.player.currentItem.currentTime) : 0.0f);
     }
+    [self fl_delegateResponseFailureWithCode:FLAudioPlayerErrorByPlayerIsNotInit];
     return @0.0f;
 }
 
+- (UISlider *)volumSlider{
+    if (_volumSlider == nil) {
+        MPVolumeView *volumView = [[MPVolumeView alloc] init];
+        _volumSlider = [volumView valueForKey:@"volumeSlider"];
+    }
+    return _volumSlider;
+}
 
 @end
 

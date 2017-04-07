@@ -16,6 +16,8 @@
 		115151111E27158F000DC167 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 115151101E27158F000DC167 /* Assets.xcassets */; };
 		115151141E27158F000DC167 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 115151121E27158F000DC167 /* LaunchScreen.storyboard */; };
 		B678BA3C1E8CB6C400D925F2 /* FLSlider.m in Sources */ = {isa = PBXBuildFile; fileRef = B678BA3B1E8CB6C400D925F2 /* FLSlider.m */; };
+		B6F7D0521E9616930049E789 /* NSObject+Model.m in Sources */ = {isa = PBXBuildFile; fileRef = B6F7D0511E9616930049E789 /* NSObject+Model.m */; };
+		B6F7D0561E964D9B0049E789 /* FLTimer.m in Sources */ = {isa = PBXBuildFile; fileRef = B6F7D0551E964D9B0049E789 /* FLTimer.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -34,6 +36,10 @@
 		115151151E27158F000DC167 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		B678BA3A1E8CB6C400D925F2 /* FLSlider.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = FLSlider.h; sourceTree = "<group>"; };
 		B678BA3B1E8CB6C400D925F2 /* FLSlider.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = FLSlider.m; sourceTree = "<group>"; };
+		B6F7D0501E9616930049E789 /* NSObject+Model.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "NSObject+Model.h"; sourceTree = "<group>"; };
+		B6F7D0511E9616930049E789 /* NSObject+Model.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "NSObject+Model.m"; sourceTree = "<group>"; };
+		B6F7D0541E964D9B0049E789 /* FLTimer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = FLTimer.h; sourceTree = "<group>"; };
+		B6F7D0551E964D9B0049E789 /* FLTimer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = FLTimer.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -66,6 +72,8 @@
 		115151031E27158F000DC167 /* FLAudioDemo */ = {
 			isa = PBXGroup;
 			children = (
+				B6F7D0531E964D9B0049E789 /* FLTimer_GCD */,
+				B6F7D04F1E9616930049E789 /* NSObject+Model */,
 				B678BA391E8CB6C400D925F2 /* FLSlider */,
 				115151071E27158F000DC167 /* AppDelegate.h */,
 				115151081E27158F000DC167 /* AppDelegate.m */,
@@ -98,6 +106,25 @@
 				B678BA3B1E8CB6C400D925F2 /* FLSlider.m */,
 			);
 			path = FLSlider;
+			sourceTree = "<group>";
+		};
+		B6F7D04F1E9616930049E789 /* NSObject+Model */ = {
+			isa = PBXGroup;
+			children = (
+				B6F7D0501E9616930049E789 /* NSObject+Model.h */,
+				B6F7D0511E9616930049E789 /* NSObject+Model.m */,
+			);
+			name = "NSObject+Model";
+			path = "FLSlider/NSObject+Model";
+			sourceTree = "<group>";
+		};
+		B6F7D0531E964D9B0049E789 /* FLTimer_GCD */ = {
+			isa = PBXGroup;
+			children = (
+				B6F7D0541E964D9B0049E789 /* FLTimer.h */,
+				B6F7D0551E964D9B0049E789 /* FLTimer.m */,
+			);
+			path = FLTimer_GCD;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -176,6 +203,8 @@
 				1151510C1E27158F000DC167 /* ViewController.m in Sources */,
 				115151091E27158F000DC167 /* AppDelegate.m in Sources */,
 				B678BA3C1E8CB6C400D925F2 /* FLSlider.m in Sources */,
+				B6F7D0561E964D9B0049E789 /* FLTimer.m in Sources */,
+				B6F7D0521E9616930049E789 /* NSObject+Model.m in Sources */,
 				110FE3521E7BF6A2007A2A3C /* FLAudioServices.m in Sources */,
 				115151061E27158F000DC167 /* main.m in Sources */,
 			);
