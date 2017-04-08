@@ -15,12 +15,10 @@
 
 NSString *FL_COVERTTIME(CGFloat second);
 
-typedef NS_ENUM(NSInteger,FLAudioRecoderStatus){
-    Recoder_NotPrepare,
-    Recoder_Prepared,
-    Recoder_Recording,
-    Recoder_Pausing,
-    Recoder_Stoping
+typedef NS_ENUM(NSInteger,FLAudioRecorderStatus){
+    Recorder_Recording,
+    Recorder_Pausing,
+    Recorder_Stoping
 };
 
 typedef NS_ENUM(NSInteger,FLAudioPlayerStatus){
@@ -29,15 +27,15 @@ typedef NS_ENUM(NSInteger,FLAudioPlayerStatus){
     Player_Stoping// 停止播放
 };
 @class FLAudioRecorder;
-@protocol FLAudioRecoderDelegate <NSObject>
+@protocol FLAudioRecorderDelegate <NSObject>
 
-- (void)fl_audioRecoder:(FLAudioRecorder *)recoder beginRecodingToUrl:(NSURL *)url;
+- (void)fl_audioRecorder:(FLAudioRecorder *)recorder beginRecodingToUrl:(NSURL *)url;
 
-- (void)fl_audioRecoder:(FLAudioRecorder *)recoder recodingWithCurrentTime:(NSNumber *)currentTime;
+- (void)fl_audioRecorder:(FLAudioRecorder *)recorder recodingWithCurrentTime:(NSNumber *)currentTime;
 
-- (void)fl_audioRecoder:(FLAudioRecorder *)recoder finishRecodingWithTotalTime:(NSNumber *)totalTime;
+- (void)fl_audioRecorder:(FLAudioRecorder *)recorder finishRecodingWithTotalTime:(NSNumber *)totalTime;
 
-- (void)fl_audioRecoder:(FLAudioRecorder *)recoder didFailureWithError:(NSError *)error;
+- (void)fl_audioRecorder:(FLAudioRecorder *)recorder didFailureWithError:(NSError *)error;
 
 @end
 
@@ -72,17 +70,19 @@ typedef NS_ENUM(NSInteger,FLAudioPlayerStatus){
  音频编码的比特率(传输的速率) 单位bps Default is 128000
  */
 @property (nonatomic,assign)NSInteger bitRate;
-@property (nonatomic,weak)id<FLAudioRecoderDelegate> delegate;
+/**
+ 录音结束时间，最多设置两位小数，默认MAXFLOAT
+ */
+@property (nonatomic,assign)CGFloat endTime;
+/**
+ 代理
+ */
+@property (nonatomic,weak)id<FLAudioRecorderDelegate> delegate;
 
 /**
- 录音状态，默认是Recoder_NotPrepare
+ 录音状态，默认是Recorder_NotPrepare
  */
-@property (nonatomic,assign,readonly)FLAudioRecoderStatus recorderStatus;
-
-/**
- 准备录音，设置参数或者stop后需要重新调用
- */
-- (void)fl_prepareToRecord;
+@property (nonatomic,assign,readonly)FLAudioRecorderStatus recorderStatus;
 
 /**
  开始录音，注意，stop后需要重新调用fl_prepareToRecord

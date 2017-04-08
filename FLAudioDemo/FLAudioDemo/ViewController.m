@@ -11,7 +11,7 @@
 #import "FLSlider.h"
 @import MediaPlayer;
 #import "NSObject+Model.h"
-@interface ViewController ()<FLAudioPlayerDelegate,FLSliderDelegate,FLAudioRecoderDelegate>
+@interface ViewController ()<FLAudioPlayerDelegate,FLSliderDelegate,FLAudioRecorderDelegate>
 @property (weak, nonatomic) IBOutlet UILabel *recordSecondLabel;
 @property (weak, nonatomic) IBOutlet UILabel *playTip;
 @property (weak, nonatomic) IBOutlet UILabel *recordTip;
@@ -60,9 +60,6 @@
 - (IBAction)clickToRecord:(id)sender {
     __weak typeof(self) weakSelf = self;
     if (self.recordSwitch.on) {
-        if (self.recoder.recorderStatus == Recoder_Stoping) {
-            [self.recoder fl_prepareToRecord];
-        }
         [self.recoder fl_start:^{
             NSLog(@"start");
             typeof(self) strongSelf = weakSelf;
@@ -119,9 +116,22 @@
 }
 
 #pragma mark - audio recorder delegate
+
+- (void)fl_audioRecorder:(FLAudioRecorder *)recorder beginRecodingToUrl:(NSURL *)url{
+    NSLog(@"开始录音");
+}
+
 - (void)fl_audioRecoder:(FLAudioRecorder *)recoder recodingWithCurrentTime:(NSNumber *)currentTime{
 //    NSLog(@"currentTime = %@",currentTime);
     self.recordSecondLabel.text = [NSString stringWithFormat:@"%@ s",currentTime];
+}
+
+- (void)fl_audioRecorder:(FLAudioRecorder *)recorder finishRecodingWithTotalTime:(NSNumber *)totalTime{
+    NSLog(@"结束录音,totalTime = %@",totalTime);
+}
+
+- (void)fl_audioRecorder:(FLAudioRecorder *)recorder didFailureWithError:(NSError *)error{
+    NSLog(@"录音失败,error = %@",error.localizedDescription);
 }
 
 #pragma mark - audio player delegate

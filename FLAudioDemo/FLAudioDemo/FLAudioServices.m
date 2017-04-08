@@ -18,38 +18,43 @@ _Pragma("clang diagnostic pop") \
 } while (0)
 
 typedef NS_ENUM(NSUInteger, FLAudioRecorderErrorCode) {
-    FLAudioRecorderErrorByRecoderIsNotInit = 1000
+    FLAudioRecorderErrorByRecorderIsNotInit = 1000,
+    FLAudioRecorderErrorByRecorderPrepareFailure,
+    FLAudioRecorderErrorByEncodingFailure,
+    FLAudioRecorderErrorByInterruption,
+    FLAudioRecorderErrorUnknown,
 };
 
 @interface FLAudioRecorder ()<AVAudioRecorderDelegate>
-@property (nonatomic,strong)AVAudioRecorder *recoder;
-@property (nonatomic,assign)FLAudioRecoderStatus recorderStatus;
-@property (nonatomic,strong)NSTimer *recordTimer;
+@property (nonatomic,strong)AVAudioRecorder *Recorder;
+@property (nonatomic,assign)FLAudioRecorderStatus recorderStatus;
 @property (nonatomic,strong)dispatch_source_t timer;
+@property (nonatomic,assign)CGFloat count;
+@property (nonatomic,assign)BOOL suspended;
 @end
 
 @implementation FLAudioRecorder
 
 - (instancetype)init{
     if (self = [super init]) {
-        [self fl_initRecoder];
+        [self fl_initRecorder];
     }
     return self;
 }
 
-- (void)fl_initRecoder{
+- (void)fl_initRecorder{
     // 先stop
     [self fl_stop:nil];
     [self fl_default];
     switch ([AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeAudio]) {
         case AVAuthorizationStatusAuthorized:{
-            [self fl_createAudioRecorder:YES];
+            [self fl_createAudioRecorder];
             break;
         }
         case AVAuthorizationStatusNotDetermined:{
             [AVCaptureDevice requestAccessForMediaType:AVMediaTypeAudio completionHandler:^(BOOL granted) {
                 if (granted) {
-                    [self fl_createAudioRecorder:YES];
+                    [self fl_createAudioRecorder];
                 }
                 else{
                     [self fl_showAuthTip];
@@ -63,24 +68,9 @@ typedef NS_ENUM(NSUInteger, FLAudioRecorderErrorCode) {
     }
 }
 
-- (void)fl_prepareToRecord{
-    if (self.recoder) {
-//        if (self.recorderStatus != Recoder_Stoping) {
-//            [self fl_stop:nil];
-//        }
-        if ([self.recoder prepareToRecord]) {
-            self.recorderStatus = Recoder_Prepared;
-        }
-        else{
-            self.recorderStatus = Recoder_NotPrepare;
-        }
-    }
-    else{
-        [self fl_delegateResponseFailureWithCode:FLAudioRecorderErrorByRecoderIsNotInit];
-    }
-}
 
-- (void)fl_createAudioRecorder:(BOOL)prepare{
+
+- (void)fl_createAudioRecorder{
     NSError *error;
     AVAudioSession * audioSession = [AVAudioSession sharedInstance];
     // 设置类别,表示该应用同时支持播放和录音
@@ -92,30 +82,35 @@ typedef NS_ENUM(NSUInteger, FLAudioRecorderErrorCode) {
     [audioSession overrideOutputAudioPort:AVAudioSessionPortOverrideSpeaker error:&error];
     
     /* The file type to record is inferred from the file extension. Will overwrite a file at the specified url if a file exists */
-    self.recoder = [[AVAudioRecorder alloc] initWithURL:[NSURL fileURLWithPath:[self fl_filePath]] settings:[self fl_recorderSetting] error:&error];
+    self.Recorder = [[AVAudioRecorder alloc] initWithURL:[NSURL fileURLWithPath:[self fl_filePath]] settings:[self fl_recorderSetting] error:&error];
     if (error) {
         NSLog(@"Error: %@", [error localizedDescription]);
-        [self fl_delegateResponseFailureWithCode:FLAudioRecorderErrorByRecoderIsNotInit];
+        [self fl_delegateResponseFailureWithCode:FLAudioRecorderErrorByRecorderIsNotInit];
         return;
     }
     
     [self fl_createTimer];
     
-    self.recoder.delegate = self;
+    self.Recorder.delegate = self;
     // 开启音量检测
-    self.recoder.meteringEnabled = YES;
-    if (prepare) {
-        [self fl_prepareToRecord];
+    self.Recorder.meteringEnabled = YES;
+    
+    if (![self.Recorder prepareToRecord]) {
+        [self fl_delegateResponseFailureWithCode:FLAudioRecorderErrorByRecorderPrepareFailure];
     }
 }
 
 - (void)fl_start:(void(^)())complete{
-    if (!self.recoder) {
-        [self fl_delegateResponseFailureWithCode:FLAudioRecorderErrorByRecoderIsNotInit];
+    if (!self.Recorder) {
+        [self fl_delegateResponseFailureWithCode:FLAudioRecorderErrorByRecorderIsNotInit];
         return;
     }
-    if (!self.recoder.isRecording && (self.recorderStatus == Recoder_Prepared || self.recorderStatus == Recoder_Pausing)) {
-        [self.recoder record];
+    if (!self.Recorder.isRecording) {
+        [self.Recorder record];
+        if (self.recorderStatus == Recorder_Stoping) {// 首次或者stop后重开
+            FL_DELEGATE_RESPONSE(self.delegate, @selector(fl_audioRecorder:beginRecodingToUrl:), @[self,[NSURL fileURLWithPath:[self fl_filePath]]], nil);
+        }
+        self.recorderStatus = Recorder_Recording;
         // 开启定时器
         [self fl_fireTimer];
         if (complete) {
@@ -133,21 +128,26 @@ typedef NS_ENUM(NSUInteger, FLAudioRecorderErrorCode) {
     __weak typeof(self) weakSelf = self;
     dispatch_source_set_event_handler(self.timer, ^{
         typeof(self) strongSelf = weakSelf;
-        FL_DELEGATE_RESPONSE(strongSelf.delegate, @selector(fl_audioRecoder:recodingWithCurrentTime:), @[strongSelf,@(count++ / 100)], nil);
+        if (strongSelf.count >= strongSelf.endTime * 100) {
+            strongSelf.count = strongSelf.endTime * 100;
+            [strongSelf fl_stopTimer];
+            return;
+        }
+        FL_DELEGATE_RESPONSE(strongSelf.delegate, @selector(fl_audioRecorder:recodingWithCurrentTime:), @[strongSelf,@(strongSelf.count++ / 100)], nil);
     });
     
 }
-// 内部计数器
-static CGFloat count = 0;
-static BOOL suspended = YES;
+// 内部计数器,不能这样，多线程会造成数据紊乱
+//static CGFloat count = 0;
+//static BOOL suspended = YES;
 
 - (void)fl_fireTimer{
     if (!self.timer) {
         return;
     }
-    if (suspended) {
+    if (self.suspended) {
         dispatch_resume(self.timer);
-        suspended = NO;
+        self.suspended = NO;
     }
 }
 
@@ -155,9 +155,9 @@ static BOOL suspended = YES;
     if (!self.timer) {
         return;
     }
-    if (!suspended) {
+    if (!self.suspended) {
         dispatch_suspend(self.timer);
-        suspended = YES;
+        self.suspended = YES;
     }
 }
 
@@ -165,24 +165,25 @@ static BOOL suspended = YES;
     if (!self.timer) {
         return;
     }
-    // 重置计数器
-    count = 0;
-    if (!suspended) {
+    if (!self.suspended) {
         dispatch_suspend(self.timer);
-        suspended = YES;
+        self.suspended = YES;
+        FL_DELEGATE_RESPONSE(self.delegate, @selector(fl_audioRecorder:finishRecodingWithTotalTime:), @[self,@(self.count / 100)], nil);
+        // 重置计数器
+        self.count = 0;
     }
     
 }
 
 - (void)fl_pause:(void(^)())complete{
-    if (!self.recoder) {
-        [self fl_delegateResponseFailureWithCode:FLAudioRecorderErrorByRecoderIsNotInit];
+    if (!self.Recorder) {
+        [self fl_delegateResponseFailureWithCode:FLAudioRecorderErrorByRecorderIsNotInit];
         return;
     }
-    if (self.recoder.isRecording) {
-        [self.recoder pause];
+    if (self.Recorder.isRecording) {
+        [self.Recorder pause];
         [self fl_pauseTimer];
-        self.recorderStatus = Recoder_Pausing;
+        self.recorderStatus = Recorder_Pausing;
         if (complete) {
             complete();
         }
@@ -190,35 +191,35 @@ static BOOL suspended = YES;
 }
 
 - (void)fl_stop:(void(^)(NSString *url))complete{
-    if (self.recoder) {
-        [self.recoder stop];
+    if (self.Recorder) {
+        [self.Recorder stop];
         [self fl_stopTimer];
-        self.recorderStatus = Recoder_Stoping;
+        self.recorderStatus = Recorder_Stoping;
         if (complete) {
             complete([self fl_filePath]);
         }
     }
     else{
-        [self fl_delegateResponseFailureWithCode:FLAudioRecorderErrorByRecoderIsNotInit];
+        [self fl_delegateResponseFailureWithCode:FLAudioRecorderErrorByRecorderIsNotInit];
     }
 }
 
 - (void)dealloc{
-    if (self.recoder) {
-        [self.recoder stop];
-        self.recorderStatus = Recoder_Stoping;
-        self.recoder = nil;
+    if (self.Recorder) {
+        [self.Recorder stop];
+        self.recorderStatus = Recorder_Stoping;
+        self.Recorder = nil;
     }
 }
 
 #pragma mark -- Setter & Getter
 
 - (BOOL)isRecording{
-    if (self.recoder) {
-        return self.recoder.isRecording;
+    if (self.Recorder) {
+        return self.Recorder.isRecording;
     }
     else{
-        [self fl_delegateResponseFailureWithCode:FLAudioRecorderErrorByRecoderIsNotInit];
+        [self fl_delegateResponseFailureWithCode:FLAudioRecorderErrorByRecorderIsNotInit];
         return NO;
     }
 }
@@ -235,6 +236,14 @@ static BOOL suspended = YES;
 
 - (void)audioRecorderEncodeErrorDidOccur:(AVAudioRecorder *)recorder error:(NSError *)error{
     // 编码错误
+    [self fl_stop:nil];
+    [self fl_delegateResponseFailureWithCode:FLAudioRecorderErrorByEncodingFailure];
+}
+
+- (void)audioRecorderBeginInterruption:(AVAudioRecorder *)recorder{
+    // 被打断
+    [self fl_stop:nil];
+    [self fl_delegateResponseFailureWithCode:FLAudioRecorderErrorByInterruption];
 }
 
 #pragma mark -- private method
@@ -246,7 +255,9 @@ static BOOL suspended = YES;
     self.bitDepthHint = 16;
     self.bitRate = 128000;
     self.audioQuality = AVAudioQualityHigh;
-    self.recorderStatus = Recoder_NotPrepare;
+    self.recorderStatus = Recorder_Stoping;
+    self.endTime = MAXFLOAT;
+    self.suspended = YES;
 }
 
 - (NSDictionary *)fl_recorderSetting{
@@ -277,29 +288,23 @@ static BOOL suspended = YES;
 }
 
 - (void)fl_delegateResponseFailureWithCode:(FLAudioRecorderErrorCode)errorCode{
-    [self fl_delegateResponseToSelector:@selector(fl_audioRecoder:didFailureWithError:) withObject:@[self,[self fl_errorWithCode:errorCode]] complete:nil];
+    [self fl_delegateResponseToSelector:@selector(fl_audioRecorder:didFailureWithError:) withObject:@[self,[self fl_errorWithCode:errorCode]] complete:nil];
 }
 
 - (NSError *)fl_errorWithCode:(NSInteger)code{
     NSString *description = @"";
     switch (code - 1000) {
         case 0:
-            description = @"播放出现错误，耳机拔出";
+            description = @"录音器出现错误，录音器未初始化，请重新创建";
             break;
         case 1:
-            description = @"播放器不能播放当前URL";
+            description = @"录音器出现错误，录音器准备失败，请重新创建";
             break;
         case 2:
-            description = @"播放器不能正常播放到结束位置";
+            description = @"录音器出现错误，编码失败";
             break;
         case 3:
-            description = @"播放器播放出现错误，应用进入后台";
-            break;
-        case 4:
-            description = @"播放器出现错误，播放器未初始化";
-            break;
-        case 5:
-            description = @"未知错误";
+            description = @"录音器出现错误，被打断";
             break;
         default:
             description = @"未知错误";
@@ -382,9 +387,11 @@ typedef NS_ENUM(NSUInteger, FLAudioPlayerErrorCode) {
 
 - (void)fl_start:(void(^)())complete{
     if (self.player) {
+        if (self.playerStatus == Player_Stoping) {// 第一次播放和结束后重新播放
+            [self fl_delegateResponseToSelector:@selector(fl_audioPlayer:beginPlayingWithTotalTime:) withObject:@[self,self.totalTime] complete:nil];
+        }
         [self.player play];
         self.playerStatus = Player_Playing;
-        [self fl_delegateResponseToSelector:@selector(fl_audioPlayer:beginPlayingWithTotalTime:) withObject:@[self,self.totalTime] complete:nil];
         if (complete) {
             complete();
         }
