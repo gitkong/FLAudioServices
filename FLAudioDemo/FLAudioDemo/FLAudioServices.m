@@ -22,6 +22,7 @@ typedef NS_ENUM(NSUInteger, FLAudioRecorderErrorCode) {
     FLAudioRecorderErrorByRecorderPrepareFailure,
     FLAudioRecorderErrorByEncodingFailure,
     FLAudioRecorderErrorByInterruption,
+    FLAudioRecorderErrorByEnterBackground,
     FLAudioRecorderErrorUnknown,
 };
 
@@ -31,6 +32,7 @@ typedef NS_ENUM(NSUInteger, FLAudioRecorderErrorCode) {
 @property (nonatomic,strong)dispatch_source_t timer;
 @property (nonatomic,assign)CGFloat count;
 @property (nonatomic,assign)BOOL suspended;
+@property (nonatomic,assign)BOOL systemPause;
 @end
 
 @implementation FLAudioRecorder
@@ -46,6 +48,10 @@ typedef NS_ENUM(NSUInteger, FLAudioRecorderErrorCode) {
     // 先stop
     [self fl_stop:nil];
     [self fl_default];
+    [self checkAuth];
+}
+
+- (void)checkAuth{
     switch ([AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeAudio]) {
         case AVAuthorizationStatusAuthorized:{
             [self fl_createAudioRecorder];
@@ -68,8 +74,6 @@ typedef NS_ENUM(NSUInteger, FLAudioRecorderErrorCode) {
     }
 }
 
-
-
 - (void)fl_createAudioRecorder{
     NSError *error;
     AVAudioSession * audioSession = [AVAudioSession sharedInstance];
@@ -78,7 +82,7 @@ typedef NS_ENUM(NSUInteger, FLAudioRecorderErrorCode) {
     // 启动音频会话管理,此时会阻断后台音乐的播放.
     [audioSession setActive:YES error: &error];
     
-    // 设置成扬声器播放
+    // 音频使用内置扬声器和麦克风
     [audioSession overrideOutputAudioPort:AVAudioSessionPortOverrideSpeaker error:&error];
     
     /* The file type to record is inferred from the file extension. Will overwrite a file at the specified url if a file exists */
@@ -95,6 +99,25 @@ typedef NS_ENUM(NSUInteger, FLAudioRecorderErrorCode) {
     // 开启音量检测
     self.Recorder.meteringEnabled = YES;
     
+    [self fl_prepare];
+    
+    [self fl_addObserver];
+}
+
+- (void)fl_addObserver{
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(applicationDidEnterBackground:) name:UIApplicationWillResignActiveNotification object:[UIApplication sharedApplication]];
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(applicationDidEnterForeground:) name:UIApplicationDidBecomeActiveNotification object:[UIApplication sharedApplication]];
+}
+
+- (void)fl_removeObserver{
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+}
+
+- (void)fl_prepare{
+    if (!self.Recorder) {
+        [self fl_delegateResponseFailureWithCode:FLAudioRecorderErrorByRecorderIsNotInit];
+        return;
+    }
     if (![self.Recorder prepareToRecord]) {
         [self fl_delegateResponseFailureWithCode:FLAudioRecorderErrorByRecorderPrepareFailure];
     }
@@ -108,7 +131,7 @@ typedef NS_ENUM(NSUInteger, FLAudioRecorderErrorCode) {
     if (!self.Recorder.isRecording) {
         [self.Recorder record];
         if (self.recorderStatus == Recorder_Stoping) {// 首次或者stop后重开
-            FL_DELEGATE_RESPONSE(self.delegate, @selector(fl_audioRecorder:beginRecodingToUrl:), @[self,[NSURL fileURLWithPath:[self fl_filePath]]], nil);
+            FL_DELEGATE_RESPONSE(self.delegate, @selector(fl_audioRecorder:beginRecordingToUrl:), @[self,[self fl_filePath]], nil);
         }
         self.recorderStatus = Recorder_Recording;
         // 开启定时器
@@ -130,10 +153,11 @@ typedef NS_ENUM(NSUInteger, FLAudioRecorderErrorCode) {
         typeof(self) strongSelf = weakSelf;
         if (strongSelf.count >= strongSelf.endTime * 100) {
             strongSelf.count = strongSelf.endTime * 100;
-            [strongSelf fl_stopTimer];
-            return;
+            [strongSelf fl_stop:nil];
         }
-        FL_DELEGATE_RESPONSE(strongSelf.delegate, @selector(fl_audioRecorder:recodingWithCurrentTime:), @[strongSelf,@(strongSelf.count++ / 100)], nil);
+        else{
+            FL_DELEGATE_RESPONSE(strongSelf.delegate, @selector(fl_audioRecorder:recordingWithCurrentTime:), @[strongSelf,@(strongSelf.count++ / 100)], nil);
+        }
     });
     
 }
@@ -168,7 +192,7 @@ typedef NS_ENUM(NSUInteger, FLAudioRecorderErrorCode) {
     if (!self.suspended) {
         dispatch_suspend(self.timer);
         self.suspended = YES;
-        FL_DELEGATE_RESPONSE(self.delegate, @selector(fl_audioRecorder:finishRecodingWithTotalTime:), @[self,@(self.count / 100)], nil);
+        FL_DELEGATE_RESPONSE(self.delegate, @selector(fl_audioRecorder:finishRecordingWithTotalTime:toUrl:), @[self,@(self.count / 100),[self fl_filePath]], nil);
         // 重置计数器
         self.count = 0;
     }
@@ -205,6 +229,7 @@ typedef NS_ENUM(NSUInteger, FLAudioRecorderErrorCode) {
 }
 
 - (void)dealloc{
+    [self fl_removeObserver];
     if (self.Recorder) {
         [self.Recorder stop];
         self.recorderStatus = Recorder_Stoping;
@@ -242,8 +267,31 @@ typedef NS_ENUM(NSUInteger, FLAudioRecorderErrorCode) {
 
 - (void)audioRecorderBeginInterruption:(AVAudioRecorder *)recorder{
     // 被打断
-    [self fl_stop:nil];
+    if (self.recorderStatus == Recorder_Recording) {
+        [self fl_pause:nil];
+        self.systemPause = YES;
+    }
+    else{
+        self.systemPause = NO;
+    }
     [self fl_delegateResponseFailureWithCode:FLAudioRecorderErrorByInterruption];
+}
+
+/* audioRecorderEndInterruption:withOptions: is called when the audio session interruption has ended and this recorder had been interrupted while recording. */
+/* Currently the only flag is AVAudioSessionInterruptionFlags_ShouldResume. */
+- (void)audioRecorderEndInterruption:(AVAudioRecorder *)recorder withOptions:(NSUInteger)flags NS_DEPRECATED_IOS(6_0, 8_0){
+    if ([self respondsToSelector:@selector(fl_pause:)] && self.systemPause) {
+        [self fl_start:nil];
+    }
+}
+
+- (void)audioRecorderEndInterruption:(AVAudioRecorder *)recorder withFlags:(NSUInteger)flags NS_DEPRECATED_IOS(4_0, 6_0){
+    [self audioRecorderEndInterruption:recorder withOptions:flags];
+}
+
+/* audioRecorderEndInterruption: is called when the preferred method, audioRecorderEndInterruption:withFlags:, is not implemented. */
+- (void)audioRecorderEndInterruption:(AVAudioRecorder *)recorder NS_DEPRECATED_IOS(2_2, 6_0){
+    [self audioRecorderEndInterruption:recorder withOptions:0];
 }
 
 #pragma mark -- private method
@@ -271,6 +319,22 @@ typedef NS_ENUM(NSUInteger, FLAudioRecorderErrorCode) {
              };
 }
 
+- (void)applicationDidEnterBackground:(NSNotification *)notification{
+    if (self.recorderStatus == Recorder_Recording) {
+        [self fl_pause:nil];
+        self.systemPause = YES;
+    }
+    else{
+        self.systemPause = NO;
+    }
+    [self fl_delegateResponseFailureWithCode:FLAudioRecorderErrorByEnterBackground];
+}
+
+- (void)applicationDidEnterForeground:(NSNotification *)notification{
+    if ([self respondsToSelector:@selector(fl_pause:)] && self.systemPause) {
+        [self fl_start:nil];
+    }
+}
 
 - (NSString *)fl_filePath{
     NSString *path = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) lastObject];
@@ -305,6 +369,9 @@ typedef NS_ENUM(NSUInteger, FLAudioRecorderErrorCode) {
             break;
         case 3:
             description = @"录音器出现错误，被打断";
+            break;
+        case 4:
+            description = @"录音器出现错误，应用进入后台";
             break;
         default:
             description = @"未知错误";
@@ -353,8 +420,6 @@ id FL_PERFORM_SELECTOR(id target,SEL selector,NSArray <id>* objects){
     }
 }
 
-#pragma mark - setter & getter
-
 @end
 
 typedef NS_ENUM(NSUInteger, FLAudioPlayerErrorCode) {
@@ -374,6 +439,8 @@ typedef NS_ENUM(NSUInteger, FLAudioPlayerErrorCode) {
 @property (nonatomic,strong)NSNumber *totalTime;
 @property (nonatomic,strong)NSNumber *currentTime;
 @property (nonatomic,strong)UISlider *volumSlider;
+@property (nonatomic,assign)BOOL systemPause;
+@property (nonatomic,strong)dispatch_semaphore_t semaphore;
 @end
 
 @implementation FLAudioPlayer
@@ -472,6 +539,7 @@ typedef NS_ENUM(NSUInteger, FLAudioPlayerErrorCode) {
     else{
         [self.player replaceCurrentItemWithPlayerItem:item];
     }
+//    self.semaphore = dispatch_semaphore_create(1);
     [self fl_addObserve];
     self.playerStatus = Player_Stoping;
     if (startImmediately) {
@@ -501,6 +569,8 @@ typedef NS_ENUM(NSUInteger, FLAudioPlayerErrorCode) {
     
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(applicationDidEnterBackground:) name:UIApplicationWillResignActiveNotification object:[UIApplication sharedApplication]];
     
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(applicationDidEnterForeground:) name:UIApplicationDidBecomeActiveNotification object:[UIApplication sharedApplication]];
+    
     if (!self.player) {
         return;
     }
@@ -510,8 +580,12 @@ typedef NS_ENUM(NSUInteger, FLAudioPlayerErrorCode) {
     __weak typeof(self) weakSelf = self;
     self.timeObserver = [self.player addPeriodicTimeObserverForInterval:CMTimeMake(1, 1) queue:dispatch_get_main_queue() usingBlock:^(CMTime time) {
         typeof(self) strongSelf = weakSelf;
+//        if (strongSelf.bufferProgress.floatValue < 1.0) {
+//            dispatch_semaphore_wait(strongSelf.semaphore, DISPATCH_TIME_FOREVER);
+//        }
         CGFloat progress = strongSelf.currentTime.doubleValue / strongSelf.totalTime.doubleValue;
-        [strongSelf fl_delegateResponseToSelector:@selector(fl_audioPlayer:playingToCurrentProgress:withBufferProgress:) withObject:@[strongSelf,@(FL_SAVE_PROGRESS(progress)),strongSelf.bufferProgress] complete:nil];
+         [strongSelf fl_delegateResponseToSelector:@selector(fl_audioPlayer:playingToCurrentProgress:withBufferProgress:) withObject:@[strongSelf,@(FL_SAVE_PROGRESS(progress)),strongSelf.bufferProgress] complete:nil];
+        
     }];
 }
 
@@ -586,7 +660,20 @@ typedef NS_ENUM(NSUInteger, FLAudioPlayerErrorCode) {
 }
 
 - (void)applicationDidEnterBackground:(NSNotification *)notification{
+    if (self.playerStatus == Player_Playing) {
+        [self fl_pause:nil];
+        self.systemPause = YES;
+    }
+    else{
+        self.systemPause = NO;
+    }
     [self fl_delegateResponseFailureWithCode:FLAudioPlayerErrorByEnterBackground];
+}
+
+- (void)applicationDidEnterForeground:(NSNotification *)notification{
+    if ([self respondsToSelector:@selector(fl_pause:)] && self.systemPause) {
+        [self fl_start:nil];
+    }
 }
 
 - (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context{
@@ -611,10 +698,14 @@ typedef NS_ENUM(NSUInteger, FLAudioPlayerErrorCode) {
         //缓冲总长度
         NSTimeInterval totalBuffer = startSeconds + durationSeconds;
         CGFloat bufferProgress = totalBuffer / self.totalTime.doubleValue;
-        self.bufferProgress = @(FL_SAVE_PROGRESS(bufferProgress));
+//        self.bufferProgress = @(FL_SAVE_PROGRESS(bufferProgress));
+        FL_DELEGATE_RESPONSE(self.delegate, @selector(fl_audioPlayer:cacheToCurrentBufferProgress:), @[self,@(FL_SAVE_PROGRESS(bufferProgress))], nil);
+//        if (self.bufferProgress.floatValue < 1.0) {
+//            dispatch_semaphore_signal(self.semaphore);
+//        }
     }
     else if ([keyPath isEqualToString:@"playbackBufferEmpty"]){
-        self.bufferProgress = @0.0f;
+//        self.bufferProgress = @0.0f;
     }
     else if ([keyPath isEqualToString:@"playbackLikelyToKeepUp"]){
     }

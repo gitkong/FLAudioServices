@@ -16,9 +16,9 @@
 NSString *FL_COVERTTIME(CGFloat second);
 
 typedef NS_ENUM(NSInteger,FLAudioRecorderStatus){
-    Recorder_Recording,
-    Recorder_Pausing,
-    Recorder_Stoping
+    Recorder_Recording,// 正在录音
+    Recorder_Pausing,// 暂停录音
+    Recorder_Stoping// 停止录音
 };
 
 typedef NS_ENUM(NSInteger,FLAudioPlayerStatus){
@@ -28,13 +28,43 @@ typedef NS_ENUM(NSInteger,FLAudioPlayerStatus){
 };
 @class FLAudioRecorder;
 @protocol FLAudioRecorderDelegate <NSObject>
+@optional
+/**
+ 首次开始录音调用，注意：pause后start不会调用，stop后start悔调用
 
-- (void)fl_audioRecorder:(FLAudioRecorder *)recorder beginRecodingToUrl:(NSURL *)url;
+ @param recorder 当前录音器
+ @param url 录音回放地址
+ */
+- (void)fl_audioRecorder:(FLAudioRecorder *)recorder beginRecordingToUrl:(NSString *)url;
 
-- (void)fl_audioRecorder:(FLAudioRecorder *)recorder recodingWithCurrentTime:(NSNumber *)currentTime;
+/**
+ 正在录音调用
 
-- (void)fl_audioRecorder:(FLAudioRecorder *)recorder finishRecodingWithTotalTime:(NSNumber *)totalTime;
+ @param recorder 当前录音器
+ @param currentTime 当前录音的秒数，单位秒，最多小数点后两位
+ */
+- (void)fl_audioRecorder:(FLAudioRecorder *)recorder recordingWithCurrentTime:(NSNumber *)currentTime;
 
+/**
+ 结束录音调用
+
+ @param recorder 当前录音器
+ @param totalTime 总录音的秒数，单位秒，最多小数点后两位
+ @param url 当前录音文件路径
+ */
+- (void)fl_audioRecorder:(FLAudioRecorder *)recorder finishRecordingWithTotalTime:(NSNumber *)totalTime toUrl:(NSString *)url;
+
+/**
+ 录音出现错误调用
+
+ @param recorder 当前录音器
+ @param error 错误类型，其中code： 1000：录音器未初始化
+                                                     1001：录音器准备播放失败
+                                                     1002：录音器编码失败，此时会停止录音
+                                                     1003：录音被打断,此时会暂停录音，结束后自动重启
+                                                     1004：应用进入后台，此时会暂停录音，进入前台自动重启
+                                                     1005:  未知错误
+ */
 - (void)fl_audioRecorder:(FLAudioRecorder *)recorder didFailureWithError:(NSError *)error;
 
 @end
@@ -85,7 +115,11 @@ typedef NS_ENUM(NSInteger,FLAudioPlayerStatus){
 @property (nonatomic,assign,readonly)FLAudioRecorderStatus recorderStatus;
 
 /**
- 开始录音，注意，stop后需要重新调用fl_prepareToRecord
+ 准备录音，设置参数后调用才生效，注意：使用默认参数（不重新设置参数），可以不需要调用
+ */
+- (void)fl_prepare;
+/**
+ 开始录音
 
  @param complete 完成回调
  */
@@ -109,7 +143,7 @@ typedef NS_ENUM(NSInteger,FLAudioPlayerStatus){
 
 @class FLAudioPlayer;
 @protocol FLAudioPlayerDelegate <NSObject>
-
+@optional
 /**
  当开始播放时会调用，对应一个音频url只会调用一次
 
@@ -123,9 +157,17 @@ typedef NS_ENUM(NSInteger,FLAudioPlayerStatus){
 
  @param audioPlayer 当前播放器
  @param progress 当前的播放进度
- @param bufferProgress 当前的缓冲进度
+ @param bufferProgress 当前的缓冲进度(备用字段，获取缓冲进度请通过cacheToCurrentBufferProgress方法)
  */
 - (void)fl_audioPlayer:(FLAudioPlayer *)audioPlayer playingToCurrentProgress:(NSNumber *)progress withBufferProgress:(NSNumber *)bufferProgress;
+
+/**
+ 当前播放缓冲进度
+
+ @param audioPlayer 当前播放器
+ @param bufferProgress 当前缓冲进度（0.0-1.0）
+ */
+- (void)fl_audioPlayer:(FLAudioPlayer *)audioPlayer cacheToCurrentBufferProgress:(NSNumber *)bufferProgress;
 
 /**
  正常结束播放调用，对应一个音频url只会调用一次
@@ -142,7 +184,7 @@ typedef NS_ENUM(NSInteger,FLAudioPlayerStatus){
  @param error 错误类型，其中code：  1000：耳机拔出
                                  1001：播放器不能播放当前URL
                                  1002：不能正常播放到结束位置
-                                 1003：进入后台
+                                 1003：进入后台，此时会暂停播放，进入前台后自动播放
                                  1004:  播放器未初始化
                                  1005:  未知错误
  */
@@ -174,7 +216,7 @@ typedef NS_ENUM(NSInteger,FLAudioPlayerStatus){
 @property (nonatomic,strong,readonly)NSNumber *currentTime;
 
 /**
- 当前缓冲进度，默认为@0.0f
+ 当前缓冲进度，默认为@0.0f（备用字段，永远为@0.0f）
  */
 @property (nonatomic,strong,readonly)NSNumber *bufferProgress;
 

@@ -9,8 +9,6 @@
 #import "ViewController.h"
 #import "FLAudioServices.h"
 #import "FLSlider.h"
-@import MediaPlayer;
-#import "NSObject+Model.h"
 @interface ViewController ()<FLAudioPlayerDelegate,FLSliderDelegate,FLAudioRecorderDelegate>
 @property (weak, nonatomic) IBOutlet UILabel *recordSecondLabel;
 @property (weak, nonatomic) IBOutlet UILabel *playTip;
@@ -45,18 +43,31 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.title = @"gitKong";
-    /*
-     *  BY gitKong
-     *
-     *  默认配置
-     */
+    
+    self.navigationItem.rightBarButtonItem=  [[UIBarButtonItem alloc] initWithTitle:@"reset" style:UIBarButtonItemStyleDone target:self action:@selector(reset)];
+    
     self.recoder = [[FLAudioRecorder alloc] init];
+    [self.recoder fl_prepare];
     self.recoder.delegate = self;
+    self.recoder.endTime = 10.33;
     self.fl_slider.backgroundColor = [UIColor lightGrayColor];
     self.fl_slider.delegate = self;
-    
-    
 }
+
+- (void)reset{
+    self.fl_slider.value = 0;
+    self.fl_slider.cacheValue = 0;
+    self.startLabel.text = @"00:00";
+    self.endLabel.text = @"00:00";
+    self.recordSecondLabel.text = @"00:00";
+    self.recordTip.text = @"录音";
+    self.playTip.text = @"播放";
+    self.recordSwitch.on = NO;
+    self.playSwitch.on = NO;
+    [self.recoder fl_stop:nil];
+    [self.player fl_stop:nil];
+}
+
 - (IBAction)clickToRecord:(id)sender {
     __weak typeof(self) weakSelf = self;
     if (self.recordSwitch.on) {
@@ -68,31 +79,22 @@
     }
     else{
         [self.recoder fl_pause:nil];
-//        [self.recoder fl_stop:^(NSString *url) {
-//            typeof(self) strongSelf = weakSelf;
-//            NSLog(@"stop");
-//            strongSelf.recordTip.text = @"录音";
-//            strongSelf.player = [[FLAudioPlayer alloc] initWithUrl:url];
-//            NSLog(@"strongSelf.player.volum = %.2lf",strongSelf.player.currentVolum);
-//            strongSelf.player.delegate = strongSelf;
-//            strongSelf.startLabel.text = FL_COVERTTIME(strongSelf.player.currentTime.doubleValue);
-//            strongSelf.endLabel.text = FL_COVERTTIME(strongSelf.player.totalTime.doubleValue);
-//        }];
+//        [self.recoder fl_stop:nil];
     }
 }
 
 - (IBAction)clickToPlay:(id)sender {
     __weak typeof(self) weakSelf = self;
     if (self.playSwitch.on) {
-        [self.recoder fl_stop:^(NSString *url) {
-            typeof(self) strongSelf = weakSelf;
-            NSLog(@"stop");
-            strongSelf.recordTip.text = @"录音";
-            strongSelf.player = [[FLAudioPlayer alloc] initWithUrl:url];
-            strongSelf.player.delegate = strongSelf;
-            strongSelf.startLabel.text = FL_COVERTTIME(strongSelf.player.currentTime.doubleValue);
-            strongSelf.endLabel.text = FL_COVERTTIME(strongSelf.player.totalTime.doubleValue);
-        }];
+//        [self.recoder fl_stop:^(NSString *url) {
+//            typeof(self) strongSelf = weakSelf;
+//            NSLog(@"stop");
+//            strongSelf.recordTip.text = @"录音";
+//            strongSelf.player = [[FLAudioPlayer alloc] initWithUrl:url];
+//            strongSelf.player.delegate = strongSelf;
+//            strongSelf.startLabel.text = FL_COVERTTIME(strongSelf.player.currentTime.doubleValue);
+//            strongSelf.endLabel.text = FL_COVERTTIME(strongSelf.player.totalTime.doubleValue);
+//        }];
         
         [self.player fl_start:^{
             typeof(self) strongSelf = weakSelf;
@@ -117,17 +119,23 @@
 
 #pragma mark - audio recorder delegate
 
-- (void)fl_audioRecorder:(FLAudioRecorder *)recorder beginRecodingToUrl:(NSURL *)url{
-    NSLog(@"开始录音");
+- (void)fl_audioRecorder:(FLAudioRecorder *)recorder beginRecordingToUrl:(NSString *)url{
+    NSLog(@"开始录音,url = %@",url);
 }
 
-- (void)fl_audioRecoder:(FLAudioRecorder *)recoder recodingWithCurrentTime:(NSNumber *)currentTime{
+- (void)fl_audioRecorder:(FLAudioRecorder *)recorder recordingWithCurrentTime:(NSNumber *)currentTime{
 //    NSLog(@"currentTime = %@",currentTime);
     self.recordSecondLabel.text = [NSString stringWithFormat:@"%@ s",currentTime];
 }
 
-- (void)fl_audioRecorder:(FLAudioRecorder *)recorder finishRecodingWithTotalTime:(NSNumber *)totalTime{
+- (void)fl_audioRecorder:(FLAudioRecorder *)recorder finishRecordingWithTotalTime:(NSNumber *)totalTime toUrl:(NSString *)url{
     NSLog(@"结束录音,totalTime = %@",totalTime);
+    self.recordSwitch.on = NO;
+    self.recordTip.text = @"录音";
+    self.player = [[FLAudioPlayer alloc] initWithUrl:url];
+    self.player.delegate = self;
+    self.startLabel.text = FL_COVERTTIME(self.player.currentTime.doubleValue);
+    self.endLabel.text = FL_COVERTTIME(self.player.totalTime.doubleValue);
 }
 
 - (void)fl_audioRecorder:(FLAudioRecorder *)recorder didFailureWithError:(NSError *)error{
@@ -142,9 +150,15 @@
 
 - (void)fl_audioPlayer:(FLAudioPlayer *)audioPlayer playingToCurrentProgress:(NSNumber *)progress withBufferProgress:(NSNumber *)bufferProgress{
     self.fl_slider.value = progress.floatValue;
-    self.fl_slider.cacheValue = bufferProgress.floatValue;
+//    NSLog(@"VC -- progress = %.2lf",bufferProgress.floatValue);
+//    self.fl_slider.cacheValue = bufferProgress.floatValue;
     self.startLabel.text = FL_COVERTTIME(self.player.totalTime.doubleValue * progress.doubleValue);
 }
+
+- (void)fl_audioPlayer:(FLAudioPlayer *)audioPlayer cacheToCurrentBufferProgress:(NSNumber *)bufferProgress{
+    self.fl_slider.cacheValue = bufferProgress.floatValue;
+}
+
 /*
  *  BY gitKong
  *
@@ -167,14 +181,14 @@ static int playMaxCount = 2;
 }
 
 - (void)fl_audioPlayer:(FLAudioPlayer *)audioPlayer didFailureWithError:(NSError *)error{
-    self.playTip.text = @"播放";
-    self.playSwitch.on = NO;
+//    self.playTip.text = @"播放";
+//    self.playSwitch.on = NO;
     if (error.code == 1000) {
         // 耳机拔出，会自动暂停
     }
     else if (error.code == 1003){
         // app 进入后台，应该暂停
-        [audioPlayer fl_pause:nil];
+//        [audioPlayer fl_pause:nil];
     }
     else if (error.code == 1004){
         NSLog(@"error.description = %@",error.description);
