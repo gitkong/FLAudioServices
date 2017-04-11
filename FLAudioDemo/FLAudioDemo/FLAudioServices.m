@@ -123,7 +123,7 @@ typedef NS_ENUM(NSUInteger, FLAudioRecorderErrorCode) {
     }
 }
 
-- (void)fl_start:(void(^)())complete{
+- (void)fl_start{
     if (!self.Recorder) {
         [self fl_delegateResponseFailureWithCode:FLAudioRecorderErrorByRecorderIsNotInit];
         return;
@@ -136,9 +136,6 @@ typedef NS_ENUM(NSUInteger, FLAudioRecorderErrorCode) {
         self.recorderStatus = Recorder_Recording;
         // 开启定时器
         [self fl_fireTimer];
-        if (complete) {
-            complete();
-        }
     }
 }
 
@@ -199,7 +196,7 @@ typedef NS_ENUM(NSUInteger, FLAudioRecorderErrorCode) {
     
 }
 
-- (void)fl_pause:(void(^)())complete{
+- (void)fl_pause{
     if (!self.Recorder) {
         [self fl_delegateResponseFailureWithCode:FLAudioRecorderErrorByRecorderIsNotInit];
         return;
@@ -208,9 +205,6 @@ typedef NS_ENUM(NSUInteger, FLAudioRecorderErrorCode) {
         [self.Recorder pause];
         [self fl_pauseTimer];
         self.recorderStatus = Recorder_Pausing;
-        if (complete) {
-            complete();
-        }
     }
 }
 
@@ -268,7 +262,7 @@ typedef NS_ENUM(NSUInteger, FLAudioRecorderErrorCode) {
 - (void)audioRecorderBeginInterruption:(AVAudioRecorder *)recorder{
     // 被打断
     if (self.recorderStatus == Recorder_Recording) {
-        [self fl_pause:nil];
+        [self fl_pause];
         self.systemPause = YES;
     }
     else{
@@ -280,8 +274,8 @@ typedef NS_ENUM(NSUInteger, FLAudioRecorderErrorCode) {
 /* audioRecorderEndInterruption:withOptions: is called when the audio session interruption has ended and this recorder had been interrupted while recording. */
 /* Currently the only flag is AVAudioSessionInterruptionFlags_ShouldResume. */
 - (void)audioRecorderEndInterruption:(AVAudioRecorder *)recorder withOptions:(NSUInteger)flags NS_DEPRECATED_IOS(6_0, 8_0){
-    if ([self respondsToSelector:@selector(fl_pause:)] && self.systemPause) {
-        [self fl_start:nil];
+    if ([self respondsToSelector:@selector(fl_pause)] && self.systemPause) {
+        [self fl_start];
     }
 }
 
@@ -321,18 +315,18 @@ typedef NS_ENUM(NSUInteger, FLAudioRecorderErrorCode) {
 
 - (void)applicationDidEnterBackground:(NSNotification *)notification{
     if (self.recorderStatus == Recorder_Recording) {
-        [self fl_pause:nil];
+        [self fl_pause];
+        [self fl_delegateResponseFailureWithCode:FLAudioRecorderErrorByEnterBackground];
         self.systemPause = YES;
     }
     else{
         self.systemPause = NO;
     }
-    [self fl_delegateResponseFailureWithCode:FLAudioRecorderErrorByEnterBackground];
 }
 
 - (void)applicationDidEnterForeground:(NSNotification *)notification{
-    if ([self respondsToSelector:@selector(fl_pause:)] && self.systemPause) {
-        [self fl_start:nil];
+    if ([self respondsToSelector:@selector(fl_pause)] && self.systemPause) {
+        [self fl_start];
     }
 }
 
@@ -433,6 +427,11 @@ typedef NS_ENUM(NSUInteger, FLAudioPlayerErrorCode) {
 
 @interface FLAudioPlayer ()
 @property (strong, nonatomic) AVPlayer *player;
+@property (nonatomic,strong)NSMutableArray<AVPlayerItem *> *valiableItems;
+@property (nonatomic,strong)NSMutableArray<NSString *> *valiableUrls;
+@property (nonatomic,strong)NSMutableArray<AVPlayerItem *> *lastItems;
+@property (nonatomic,strong)NSString *currentUrl;
+@property (nonatomic,assign)NSInteger currentIndex;
 @property (nonatomic,assign)FLAudioPlayerStatus playerStatus;
 @property (nonatomic,strong)id timeObserver;
 @property (nonatomic,strong)NSNumber *bufferProgress;
@@ -445,50 +444,141 @@ typedef NS_ENUM(NSUInteger, FLAudioPlayerErrorCode) {
 
 @implementation FLAudioPlayer
 
-- (instancetype)initWithUrl:(NSString *)urlString{
+- (instancetype)initWithUrl:(id)url{
+    if ([url isKindOfClass:[NSString class]]) {
+        NSString *urlString = (NSString *)url;
+        return [self initWithSingelUrl:urlString];
+    }
+    else if ([url isKindOfClass:[NSArray class]]){
+        NSArray <NSString *> *urls = (NSArray <NSString *> *)url;
+        return [self initWithMutableUrl:urls];
+    }
+    else{
+        return nil;
+    }
+}
+
+- (instancetype)initWithSingelUrl:(NSString *)urlString{
     if (self = [super init]) {
-        [self fl_createPlayWithUrl:urlString andStartImmediately:NO];
+        [self.valiableItems removeAllObjects];
+        [self.lastItems removeAllObjects];
+        [self.valiableUrls removeAllObjects];
+        AVPlayerItem *item = [AVPlayerItem playerItemWithURL:[self fl_getSuitableUrl:urlString]];
+        [self fl_createPlayWithItem:item andStartImmediately:NO];
+        [self.valiableUrls addObject:urlString];
+        [self.valiableItems addObject:item];
+        [self.lastItems addObject:item];
+        self.currentUrl = urlString;
     }
     return self;
 }
 
-- (void)fl_start:(void(^)())complete{
+- (instancetype)initWithMutableUrl:(NSArray <NSString *>*)urlStrings{
+    if (self = [super init]) {
+        [self.valiableItems removeAllObjects];
+        [self.lastItems removeAllObjects];
+        [self.valiableUrls removeAllObjects];
+        [self.valiableUrls addObjectsFromArray:urlStrings];
+        
+        for (NSString *urlString in urlStrings) {
+            AVPlayerItem *item = [AVPlayerItem playerItemWithURL:[self fl_getSuitableUrl:urlString]];
+            [self.valiableItems addObject:item];
+            [self.lastItems addObject:item];
+        }
+        self.currentUrl = urlStrings.firstObject;
+        [self fl_createPlayWithItem:self.lastItems.firstObject andStartImmediately:NO];
+    }
+    return self;
+}
+
+- (void)fl_addUrl:(id)url{
+    if (!self.player) {
+        NSLog(@"还没创建播放器呢");
+        return;
+    }
+    if ([url isKindOfClass:[NSString class]]) {
+        NSString *urlString = (NSString *)url;
+        [self.valiableUrls addObject:urlString];
+        AVPlayerItem *item = [AVPlayerItem playerItemWithURL:[self fl_getSuitableUrl:urlString]];
+        [self.lastItems addObject:item];
+        [self.valiableItems addObject:item];
+    }
+    else if ([url isKindOfClass:[NSArray class]]){
+        NSArray <NSString *> *urls = (NSArray <NSString *> *)url;
+        [self.valiableUrls addObjectsFromArray:urls];
+        for (NSString *urlString in urls) {
+            AVPlayerItem *item = [AVPlayerItem playerItemWithURL:[self fl_getSuitableUrl:urlString]];
+            [self.lastItems addObject:item];
+            [self.valiableItems addObject:item];
+        }
+    }
+}
+
+- (void)fl_moveToNext{
+    if (!self.player || !self.valiableUrls.count) {
+        return;
+    }
+    NSInteger currentIndex = self.currentIndex;
+    if (currentIndex != self.valiableUrls.count - 1) {
+        currentIndex++;
+    }
+    [self fl_moveToIndex:currentIndex andStartImmediately:YES];
+}
+
+- (void)fl_moveToPrevious{
+    if (!self.player || !self.valiableUrls.count) {
+        return;
+    }
+    NSInteger currentIndex = self.currentIndex;
+    if (currentIndex != 0) {
+        currentIndex--;
+    }
+    [self fl_moveToIndex:currentIndex andStartImmediately:YES];
+}
+
+- (void)fl_moveToIndex:(NSInteger)index andStartImmediately:(BOOL)startImmediately{
+    if (!self.player || !self.valiableUrls.count) {
+        return;
+    }
+    // stop current
+    [self fl_stop];
+    
+    [self.lastItems removeAllObjects];
+    NSMutableArray <AVPlayerItem *>*tempArrM = self.valiableItems.mutableCopy;
+    NSIndexSet *se = [NSIndexSet indexSetWithIndexesInRange:NSMakeRange(index, tempArrM.count - index)];
+    [self.lastItems addObjectsFromArray:[tempArrM objectsAtIndexes:se]];
+    AVPlayerItem *firstItem = self.lastItems.firstObject;
+    [self fl_createPlayWithItem:firstItem andStartImmediately:startImmediately];
+}
+
+- (void)fl_start{
     if (self.player) {
         if (self.playerStatus == Player_Stoping) {// 第一次播放和结束后重新播放
-            [self fl_delegateResponseToSelector:@selector(fl_audioPlayer:beginPlayingWithTotalTime:) withObject:@[self,self.totalTime] complete:nil];
+            [self fl_delegateResponseToSelector:@selector(fl_audioPlayer:beginPlaying:withTotalTime:) withObject:@[self,self.currentUrl,self.totalTime] complete:nil];
         }
         [self.player play];
         self.playerStatus = Player_Playing;
-        if (complete) {
-            complete();
-        }
     }
     else{
         [self fl_delegateResponseFailureWithCode:FLAudioPlayerErrorByPlayerIsNotInit];
     }
 }
 
-- (void)fl_pause:(void(^)())complete{
+- (void)fl_pause{
     if (self.player) {
         [self.player pause];
         self.playerStatus = Player_Pausing;
-        if (complete) {
-            complete();
-        }
     }
     else{
         [self fl_delegateResponseFailureWithCode:FLAudioPlayerErrorByPlayerIsNotInit];
     }
 }
 
-- (void)fl_stop:(void(^)())complete{
+- (void)fl_stop{
     if (self.player) {
         [self.player pause];
         self.playerStatus = Player_Stoping;
         [self fl_seek:self.player toTime:0 andStartImmediately:NO complete:^(BOOL finished) {
-            if (complete) {
-                complete();
-            }
         }];
     }
     else{
@@ -505,7 +595,7 @@ typedef NS_ENUM(NSUInteger, FLAudioPlayerErrorCode) {
     
     if (self.player) {
         if (self.playerStatus == Player_Playing) {
-            [self fl_pause:nil];
+            [self fl_pause];
         }
         [self fl_seek:self.player toTime:time andStartImmediately:startImmediately complete:complete];
     }
@@ -528,11 +618,11 @@ typedef NS_ENUM(NSUInteger, FLAudioPlayerErrorCode) {
     return url;
 }
 
-- (void)fl_createPlayWithUrl:(NSString *)urlString andStartImmediately:(BOOL)startImmediately{
+- (void)fl_createPlayWithItem:(AVPlayerItem *)item andStartImmediately:(BOOL)startImmediately{
     // 销毁之前的
     [self fl_removeObserve];
     // 创建新的
-    AVPlayerItem *item = [AVPlayerItem playerItemWithURL:[self fl_getSuitableUrl:urlString]];
+    
     if (!self.player) {
         self.player = [AVPlayer playerWithPlayerItem:item];
     }
@@ -543,7 +633,7 @@ typedef NS_ENUM(NSUInteger, FLAudioPlayerErrorCode) {
     [self fl_addObserve];
     self.playerStatus = Player_Stoping;
     if (startImmediately) {
-        [self fl_start:nil];
+        [self fl_start];
     }
 }
 
@@ -552,7 +642,7 @@ typedef NS_ENUM(NSUInteger, FLAudioPlayerErrorCode) {
     [player seekToTime:CMTimeMakeWithSeconds(time, 1 *NSEC_PER_SEC) completionHandler:^(BOOL finished) {
         typeof(self) strongSelf = weakSelf;
         if (startImmediately) {
-            [strongSelf fl_start:nil];
+            [strongSelf fl_start];
         }
         if (complete) {
             complete(finished);
@@ -626,16 +716,48 @@ typedef NS_ENUM(NSUInteger, FLAudioPlayerErrorCode) {
 }
 
 - (void)didFinishPlay:(NSNotification *)notification{
-    if (self.delegate && [self.delegate respondsToSelector:@selector(fl_audioPlayer:didFinishAndPlayNext:)]) {
-        NSString __autoreleasing *nextUrl = nil;
-        [self.delegate fl_audioPlayer:self didFinishAndPlayNext:&nextUrl];
-        if (nextUrl) {
-            [self fl_createPlayWithUrl:nextUrl andStartImmediately:YES];
+    BOOL flag = YES;
+    if (self.lastItems.count > 0) {
+        [self.lastItems removeObject:self.player.currentItem];
+        if (self.lastItems.count > 0) {
+            self.currentIndex = self.valiableUrls.count - self.lastItems.count;
+            self.currentUrl = [self.valiableUrls objectAtIndex:self.currentIndex];
+            
+            [self fl_createPlayWithItem:self.lastItems.firstObject andStartImmediately:YES];
+            flag = NO;
         }
         else{
-            [self fl_stop:nil];
+            flag = YES;
+            [self fl_stop];
         }
     }
+    else{
+        flag = YES;
+        [self fl_stop];
+    }
+    [self fl_delegateResponseToSelector:@selector(fl_audioPlayer:didFinishWithFlag:) withObject:@[self,@(flag)] complete:nil];
+    
+    /* 废弃 */
+//    if (self.delegate && [self.delegate respondsToSelector:@selector(fl_audioPlayer:didFinishAndPlayNext:)]) {
+//        NSString __autoreleasing *nextUrl = nil;
+//        [self.delegate fl_audioPlayer:self didFinishAndPlayNext:&nextUrl];
+//        if (nextUrl) {
+//            if (self.lastItems.count == 0) {
+//                AVPlayerItem *item = [AVPlayerItem playerItemWithURL:[self fl_getSuitableUrl:nextUrl]];
+//                [self.valiableItems addObject:item];
+//                [self.lastItems addObject:item];
+//                [self fl_createPlayWithItem:item andStartImmediately:YES];
+//            }
+//        }
+//        else{
+//            if (self.lastItems.count == 0){
+//                [self fl_stop:nil];
+//            }
+//        }
+    
+//    }
+    
+    
 }
 
 - (void)didFailedToPlayToEndTime:(NSNotification *)notification{
@@ -661,18 +783,18 @@ typedef NS_ENUM(NSUInteger, FLAudioPlayerErrorCode) {
 
 - (void)applicationDidEnterBackground:(NSNotification *)notification{
     if (self.playerStatus == Player_Playing) {
-        [self fl_pause:nil];
+        [self fl_pause];
+        [self fl_delegateResponseFailureWithCode:FLAudioPlayerErrorByEnterBackground];
         self.systemPause = YES;
     }
     else{
         self.systemPause = NO;
     }
-    [self fl_delegateResponseFailureWithCode:FLAudioPlayerErrorByEnterBackground];
 }
 
 - (void)applicationDidEnterForeground:(NSNotification *)notification{
-    if ([self respondsToSelector:@selector(fl_pause:)] && self.systemPause) {
-        [self fl_start:nil];
+    if ([self respondsToSelector:@selector(fl_pause)] && self.systemPause) {
+        [self fl_start];
     }
 }
 
@@ -809,6 +931,31 @@ NSString *FL_COVERTTIME(CGFloat second){
         _volumSlider = [volumView valueForKey:@"volumeSlider"];
     }
     return _volumSlider;
+}
+
+- (NSMutableArray<AVPlayerItem *> *)valiableItems{
+    if (_valiableItems == nil) {
+        _valiableItems = [NSMutableArray array];
+    }
+    return _valiableItems;
+}
+
+- (NSMutableArray<NSString *> *)valiableUrls{
+    if (_valiableUrls == nil) {
+        _valiableUrls = [NSMutableArray array];
+    }
+    return _valiableUrls;
+}
+
+- (NSMutableArray<AVPlayerItem *> *)lastItems{
+    if (_lastItems == nil) {
+        _lastItems = [NSMutableArray array];
+    }
+    return _lastItems;
+}
+
+- (NSInteger)lastTotalItemsCount{
+    return self.lastItems.count;
 }
 
 @end

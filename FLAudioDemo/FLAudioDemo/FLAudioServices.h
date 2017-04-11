@@ -120,17 +120,13 @@ typedef NS_ENUM(NSInteger,FLAudioPlayerStatus){
 - (void)fl_prepare;
 /**
  开始录音
-
- @param complete 完成回调
  */
-- (void)fl_start:(void(^)())complete;
+- (void)fl_start;
 
 /**
  暂停录音
-
- @param complete 完成回调
  */
-- (void)fl_pause:(void(^)())complete;
+- (void)fl_pause;
 
 /**
  结束录音，url 为默认录音文件路径
@@ -144,13 +140,15 @@ typedef NS_ENUM(NSInteger,FLAudioPlayerStatus){
 @class FLAudioPlayer;
 @protocol FLAudioPlayerDelegate <NSObject>
 @optional
+
 /**
  当开始播放时会调用，对应一个音频url只会调用一次
 
  @param audioPlayer 当前播放器
+ @param currentUrl 当前播放url地址
  @param totalTime 当前播放url的总时间，单位秒
  */
-- (void)fl_audioPlayer:(FLAudioPlayer *)audioPlayer beginPlayingWithTotalTime:(NSNumber *)totalTime;
+- (void)fl_audioPlayer:(FLAudioPlayer *)audioPlayer beginPlaying:(NSString *)currentUrl withTotalTime:(NSNumber *)totalTime;
 
 /**
  正在播放会调用，多次执行，不建议在此代理方法处理复杂操作
@@ -170,12 +168,22 @@ typedef NS_ENUM(NSInteger,FLAudioPlayerStatus){
 - (void)fl_audioPlayer:(FLAudioPlayer *)audioPlayer cacheToCurrentBufferProgress:(NSNumber *)bufferProgress;
 
 /**
- 正常结束播放调用，对应一个音频url只会调用一次
-
+ 正常结束播放调用，对应一个音频url只会调用一次（废弃！！！）
+ 如果要播放多条，可通过initWithUrl方法传入url数组,考虑到最新url通过异步请求获得
+ 无法准确传入，因此暂时废弃，待优化
+ 
  @param audioPlayer 当前播放器
  @param nextUrl 下一条要播放的url，nil表示不自动放下一条，默认nil
  */
-- (void)fl_audioPlayer:(FLAudioPlayer *)audioPlayer didFinishAndPlayNext:(NSString * __autoreleasing *)nextUrl;
+- (void)fl_audioPlayer:(FLAudioPlayer *)audioPlayer didFinishAndPlayNext:(NSString * __autoreleasing *)nextUrl;//废弃
+
+/**
+ 正常结束播放调用，对应一个音频url只会调用一次
+
+ @param audioPlayer 当前播放器
+ @param isFinishAll 是否全部播放完毕
+ */
+- (void)fl_audioPlayer:(FLAudioPlayer *)audioPlayer didFinishWithFlag:(NSNumber *)isFinishAll;
 
 /**
  错误代理回调，注意：耳机拔出也会调用
@@ -194,6 +202,15 @@ typedef NS_ENUM(NSInteger,FLAudioPlayerStatus){
 
 
 @interface FLAudioPlayer : NSObject
+/**
+ 表示当前可播放的url数组
+ */
+@property (nonatomic,strong,readonly)NSMutableArray<NSString *> *valiableUrls;
+
+/**
+ 剩下可播放的url地址数
+ */
+@property (nonatomic,assign,readonly)NSInteger lastTotalItemsCount;
 
 /**
  当前播放的音量大小（0.0-1.0）,注意，播放音频的时候设置才生效
@@ -228,34 +245,41 @@ typedef NS_ENUM(NSInteger,FLAudioPlayerStatus){
 /**
  播放地址
 
- @param urlString 本地文件url或者网络文件url
+ @param url 本地文件url或者网络文件url，可传数组和字符串
  @return 返回当前播放对象
  */
-- (instancetype)initWithUrl:(NSString *)urlString;
+- (instancetype)initWithUrl:(id)url;
 
 /**
- 开始播放，fl_playerStatus为Player_Playing
+ 添加新的播放地址
+
+ @param url 新的播放地址，可传数组和字符串地址
+ */
+- (void)fl_addUrl:(id)url;
+
+- (void)fl_moveToNext;
+
+- (void)fl_moveToPrevious;
+
+- (void)fl_moveToIndex:(NSInteger)index andStartImmediately:(BOOL)startImmediately;
+
+/**
+ 开始播放当前url地址，fl_playerStatus为Player_Playing
  如果调用前fl_playerStatus为Player_Pausing，则继续播放
  如果调用前fl_playerStatus为Player_Stoping，则重新播放
-
- @param complete 完成回调，开始播放后执行
  */
-- (void)fl_start:(void(^)())complete;
+- (void)fl_start;
 
 /**
  暂停播放，此时对应 fl_playerStatus 为 Player_Pausing
  可通过 fl_start 方法继续播放
-
- @param complete 完成回调，暂停后执行
  */
-- (void)fl_pause:(void(^)())complete;
+- (void)fl_pause;
 
 /**
  停止播放，此时进度会重置为0，此时对应 fl_playerStatus 为 Player_Stoping
-
- @param complete 完成回调，停止播放后执行
  */
-- (void)fl_stop:(void(^)())complete;
+- (void)fl_stop;
 
 
 /**

@@ -10,6 +10,7 @@
 #import "FLAudioServices.h"
 #import "FLSlider.h"
 @interface ViewController ()<FLAudioPlayerDelegate,FLSliderDelegate,FLAudioRecorderDelegate>
+@property (weak, nonatomic) IBOutlet UILabel *totalUrlCount;
 @property (weak, nonatomic) IBOutlet UILabel *recordSecondLabel;
 @property (weak, nonatomic) IBOutlet UILabel *playTip;
 @property (weak, nonatomic) IBOutlet UILabel *recordTip;
@@ -49,7 +50,7 @@
     self.recoder = [[FLAudioRecorder alloc] init];
     [self.recoder fl_prepare];
     self.recoder.delegate = self;
-    self.recoder.endTime = 10.33;
+    self.recoder.endTime = 3.33;
     self.fl_slider.backgroundColor = [UIColor lightGrayColor];
     self.fl_slider.delegate = self;
 }
@@ -65,56 +66,55 @@
     self.recordSwitch.on = NO;
     self.playSwitch.on = NO;
     [self.recoder fl_stop:nil];
-    [self.player fl_stop:nil];
+    [self.player fl_stop];
 }
 
 - (IBAction)clickToRecord:(id)sender {
-    __weak typeof(self) weakSelf = self;
     if (self.recordSwitch.on) {
-        [self.recoder fl_start:^{
-            NSLog(@"start");
-            typeof(self) strongSelf = weakSelf;
-            strongSelf.recordTip.text = @"正在录音...";
-        }];
+        [self.recoder fl_start];
+        self.recordTip.text = @"正在录音...";
     }
     else{
-        [self.recoder fl_pause:nil];
+        [self.recoder fl_pause];
 //        [self.recoder fl_stop:nil];
     }
 }
 
 - (IBAction)clickToPlay:(id)sender {
-    __weak typeof(self) weakSelf = self;
     if (self.playSwitch.on) {
-//        [self.recoder fl_stop:^(NSString *url) {
-//            typeof(self) strongSelf = weakSelf;
-//            NSLog(@"stop");
-//            strongSelf.recordTip.text = @"录音";
-//            strongSelf.player = [[FLAudioPlayer alloc] initWithUrl:url];
-//            strongSelf.player.delegate = strongSelf;
-//            strongSelf.startLabel.text = FL_COVERTTIME(strongSelf.player.currentTime.doubleValue);
-//            strongSelf.endLabel.text = FL_COVERTTIME(strongSelf.player.totalTime.doubleValue);
-//        }];
-        
-        [self.player fl_start:^{
-            typeof(self) strongSelf = weakSelf;
-            strongSelf.playTip.text = @"正在播放...";
-            strongSelf.startLabel.text = FL_COVERTTIME(strongSelf.player.currentTime.doubleValue);
-            strongSelf.endLabel.text = FL_COVERTTIME(strongSelf.player.totalTime.doubleValue);
-        }];
+        [self.player fl_start];
+        self.playTip.text = @"正在播放...";
+        self.startLabel.text = FL_COVERTTIME(self.player.currentTime.doubleValue);
+        self.endLabel.text = FL_COVERTTIME(self.player.totalTime.doubleValue);
     }
     else{
-        [self.player fl_pause:^{
-            typeof(self) strongSelf = weakSelf;
-            NSLog(@"pause");
-            /*
-             *  BY gitKong
-             *
-             *  是不会出现循环引用，因此player没有引用block，安全起见，还是建议加上
-             */
-            strongSelf.playTip.text = @"播放";
-        }];
+        [self.player fl_pause];
+        self.playTip.text = @"播放";
     }
+}
+- (IBAction)addNewPlayUrl:(id)sender {
+    NSString *str = @"hTtp://ws.stream.qqmusic.qq.com/M500001VfvsJ21xFqb.mp3?guid=ffffffff82def4af4b12b3cd9337d5e7&uin=346897220&vkey=6292F51E1E384E061FF02C31F716658E5C81F5594D561F2E88B854E81CAAB7806D5E4F103E55D33C16F3FAC506D1AB172DE8600B37E43FAD&fromtag=46";
+    if (!self.player) {
+        NSLog(@"还没创建播放器呢，别着急...");
+        return;
+    }
+    [self.player fl_addUrl:str];
+    
+    self.totalUrlCount.text = [NSString stringWithFormat:@"总剩下地址数：%zd",self.player.lastTotalItemsCount];
+}
+- (IBAction)previous:(id)sender {
+    if (!self.player) {
+        return;
+    }
+    [self.player fl_moveToPrevious];
+    self.totalUrlCount.text = [NSString stringWithFormat:@"总剩下地址数：%zd",self.player.lastTotalItemsCount];
+}
+- (IBAction)next:(id)sender {
+    if (!self.player) {
+        return;
+    }
+    [self.player fl_moveToNext];
+    self.totalUrlCount.text = [NSString stringWithFormat:@"总剩下地址数：%zd",self.player.lastTotalItemsCount];
 }
 
 #pragma mark - audio recorder delegate
@@ -132,10 +132,13 @@
     NSLog(@"结束录音,totalTime = %@",totalTime);
     self.recordSwitch.on = NO;
     self.recordTip.text = @"录音";
-    self.player = [[FLAudioPlayer alloc] initWithUrl:url];
+    
+     NSString *str = @"hTtp://ws.stream.qqmusic.qq.com/M500001VfvsJ21xFqb.mp3?guid=ffffffff82def4af4b12b3cd9337d5e7&uin=346897220&vkey=6292F51E1E384E061FF02C31F716658E5C81F5594D561F2E88B854E81CAAB7806D5E4F103E55D33C16F3FAC506D1AB172DE8600B37E43FAD&fromtag=46";
+    self.player = [[FLAudioPlayer alloc] initWithUrl:@[url,str]];
     self.player.delegate = self;
     self.startLabel.text = FL_COVERTTIME(self.player.currentTime.doubleValue);
     self.endLabel.text = FL_COVERTTIME(self.player.totalTime.doubleValue);
+    self.totalUrlCount.text = [NSString stringWithFormat:@"总剩下地址数：%zd",self.player.lastTotalItemsCount];
 }
 
 - (void)fl_audioRecorder:(FLAudioRecorder *)recorder didFailureWithError:(NSError *)error{
@@ -144,7 +147,8 @@
 
 #pragma mark - audio player delegate
 
-- (void)fl_audioPlayer:(FLAudioPlayer *)audioPlayer beginPlayingWithTotalTime:(NSNumber *)totalTime{
+- (void)fl_audioPlayer:(FLAudioPlayer *)audioPlayer beginPlaying:(NSString *)currentUrl withTotalTime:(NSNumber *)totalTime{
+    NSLog(@"currentUrl = %@",currentUrl);
     self.endLabel.text = FL_COVERTTIME(totalTime.doubleValue);
 }
 
@@ -164,7 +168,7 @@
  *
  *  模拟下一个播放的个数
  */
-static int playMaxCount = 2;
+static int playMaxCount = 1;
 
 - (void)fl_audioPlayer:(FLAudioPlayer *)audioPlayer didFinishAndPlayNext:(NSString *__autoreleasing *)nextUrl{
     
@@ -177,6 +181,14 @@ static int playMaxCount = 2;
     else{
         playMaxCount--;
         *nextUrl = str;
+    }
+}
+
+- (void)fl_audioPlayer:(FLAudioPlayer *)audioPlayer didFinishWithFlag:(NSNumber *)isFinishAll{
+    self.totalUrlCount.text = [NSString stringWithFormat:@"总剩下地址数：%zd",self.player.lastTotalItemsCount];
+    if (isFinishAll.boolValue) {
+        self.playTip.text = @"播放";
+        self.playSwitch.on = NO;
     }
 }
 
@@ -196,7 +208,7 @@ static int playMaxCount = 2;
     else{
         // 其他错误应该stop
         
-        [audioPlayer fl_stop:nil];
+        [audioPlayer fl_stop];
     }
     
     NSLog(@"error : %@",error.localizedDescription);
