@@ -257,10 +257,21 @@ typedef NS_ENUM(NSInteger,FLAudioPlayerStatus){
  */
 - (void)fl_addUrl:(id)url;
 
+/**
+ 移动播放点到下一条，意味着从下一条开始继续往下播放，默认自动开始播放
+ */
 - (void)fl_moveToNext;
-
+/**
+ 移动播放点到上一条，意味着从上一条开始继续往下播放，默认自动开始播放
+ */
 - (void)fl_moveToPrevious;
 
+/**
+ 移动播放点到指定位置
+
+ @param index 指点位置
+ @param startImmediately 是否马上播放
+ */
 - (void)fl_moveToIndex:(NSInteger)index andStartImmediately:(BOOL)startImmediately;
 
 /**

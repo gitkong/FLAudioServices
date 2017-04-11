@@ -524,7 +524,7 @@ typedef NS_ENUM(NSUInteger, FLAudioPlayerErrorCode) {
     }
     [self fl_moveToIndex:currentIndex andStartImmediately:YES];
 }
-
+#warning TODO 录音地址可能有问题
 - (void)fl_moveToPrevious{
     if (!self.player || !self.valiableUrls.count) {
         return;
@@ -540,6 +540,11 @@ typedef NS_ENUM(NSUInteger, FLAudioPlayerErrorCode) {
     if (!self.player || !self.valiableUrls.count) {
         return;
     }
+    
+    if (index < 0 || index > self.valiableUrls.count - 1) {
+        return;
+    }
+    
     // stop current
     [self fl_stop];
     
