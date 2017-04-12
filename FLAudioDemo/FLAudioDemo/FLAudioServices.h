@@ -243,7 +243,7 @@ typedef NS_ENUM(NSInteger,FLAudioPlayerStatus){
 @property (nonatomic,weak)id<FLAudioPlayerDelegate> delegate;
 
 /**
- 播放地址
+ 播放地址，如果传入数组，自动播放会按数组元素排序顺序进行
 
  @param url 本地文件url或者网络文件url，可传数组和字符串
  @return 返回当前播放对象
@@ -251,7 +251,7 @@ typedef NS_ENUM(NSInteger,FLAudioPlayerStatus){
 - (instancetype)initWithUrl:(id)url;
 
 /**
- 添加新的播放地址
+ 动态添加新的播放地址,新增的在队列最后
 
  @param url 新的播放地址，可传数组和字符串地址
  */

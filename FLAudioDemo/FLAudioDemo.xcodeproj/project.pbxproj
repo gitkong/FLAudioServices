@@ -16,6 +16,7 @@
 		115151111E27158F000DC167 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 115151101E27158F000DC167 /* Assets.xcassets */; };
 		115151141E27158F000DC167 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 115151121E27158F000DC167 /* LaunchScreen.storyboard */; };
 		B678BA3C1E8CB6C400D925F2 /* FLSlider.m in Sources */ = {isa = PBXBuildFile; fileRef = B678BA3B1E8CB6C400D925F2 /* FLSlider.m */; };
+		B6D00B6E1E9E209F00EFA608 /* Thank You.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = B6D00B6D1E9E209F00EFA608 /* Thank You.mp3 */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -34,6 +35,7 @@
 		115151151E27158F000DC167 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		B678BA3A1E8CB6C400D925F2 /* FLSlider.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = FLSlider.h; sourceTree = "<group>"; };
 		B678BA3B1E8CB6C400D925F2 /* FLSlider.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = FLSlider.m; sourceTree = "<group>"; };
+		B6D00B6D1E9E209F00EFA608 /* Thank You.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = "Thank You.mp3"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -84,6 +86,7 @@
 		115151041E27158F000DC167 /* Supporting Files */ = {
 			isa = PBXGroup;
 			children = (
+				B6D00B6D1E9E209F00EFA608 /* Thank You.mp3 */,
 				111ECC451E383C3D0001A2B6 /* MP3Sample.mp3 */,
 				115151051E27158F000DC167 /* main.m */,
 			);
@@ -168,6 +171,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				115151141E27158F000DC167 /* LaunchScreen.storyboard in Resources */,
+				B6D00B6E1E9E209F00EFA608 /* Thank You.mp3 in Resources */,
 				111ECC461E383C3D0001A2B6 /* MP3Sample.mp3 in Resources */,
 				115151111E27158F000DC167 /* Assets.xcassets in Resources */,
 				1151510F1E27158F000DC167 /* Main.storyboard in Resources */,

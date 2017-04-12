@@ -518,22 +518,20 @@ typedef NS_ENUM(NSUInteger, FLAudioPlayerErrorCode) {
     if (!self.player || !self.valiableUrls.count) {
         return;
     }
-    NSInteger currentIndex = self.currentIndex;
-    if (currentIndex != self.valiableUrls.count - 1) {
-        currentIndex++;
+    if (self.currentIndex != self.valiableUrls.count - 1) {
+        self.currentIndex++;
     }
-    [self fl_moveToIndex:currentIndex andStartImmediately:YES];
+    [self fl_moveToIndex:self.currentIndex andStartImmediately:YES];
 }
-#warning TODO 录音地址可能有问题
+
 - (void)fl_moveToPrevious{
     if (!self.player || !self.valiableUrls.count) {
         return;
     }
-    NSInteger currentIndex = self.currentIndex;
-    if (currentIndex != 0) {
-        currentIndex--;
+    if (self.currentIndex != 0) {
+        self.currentIndex--;
     }
-    [self fl_moveToIndex:currentIndex andStartImmediately:YES];
+    [self fl_moveToIndex:self.currentIndex andStartImmediately:YES];
 }
 
 - (void)fl_moveToIndex:(NSInteger)index andStartImmediately:(BOOL)startImmediately{
@@ -553,6 +551,7 @@ typedef NS_ENUM(NSUInteger, FLAudioPlayerErrorCode) {
     NSIndexSet *se = [NSIndexSet indexSetWithIndexesInRange:NSMakeRange(index, tempArrM.count - index)];
     [self.lastItems addObjectsFromArray:[tempArrM objectsAtIndexes:se]];
     AVPlayerItem *firstItem = self.lastItems.firstObject;
+    self.currentUrl = self.valiableUrls[index];
     [self fl_createPlayWithItem:firstItem andStartImmediately:startImmediately];
 }
 
@@ -638,7 +637,8 @@ typedef NS_ENUM(NSUInteger, FLAudioPlayerErrorCode) {
     [self fl_addObserve];
     self.playerStatus = Player_Stoping;
     if (startImmediately) {
-        [self fl_start];
+//        [self fl_start];
+        [self fl_seekToProgress:0.0f complete:nil];
     }
 }
 

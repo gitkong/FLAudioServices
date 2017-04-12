@@ -93,12 +93,14 @@
     }
 }
 - (IBAction)addNewPlayUrl:(id)sender {
-    NSString *str = @"hTtp://ws.stream.qqmusic.qq.com/M500001VfvsJ21xFqb.mp3?guid=ffffffff82def4af4b12b3cd9337d5e7&uin=346897220&vkey=6292F51E1E384E061FF02C31F716658E5C81F5594D561F2E88B854E81CAAB7806D5E4F103E55D33C16F3FAC506D1AB172DE8600B37E43FAD&fromtag=46";
+//    NSString *str = @"hTtp://ws.stream.qqmusic.qq.com/M500001VfvsJ21xFqb.mp3?guid=ffffffff82def4af4b12b3cd9337d5e7&uin=346897220&vkey=6292F51E1E384E061FF02C31F716658E5C81F5594D561F2E88B854E81CAAB7806D5E4F103E55D33C16F3FAC506D1AB172DE8600B37E43FAD&fromtag=46";
+    NSString *str = [[NSBundle mainBundle] pathForResource:@"Thank You" ofType:@"mp3"];
+    NSString *str1 = [[NSBundle mainBundle] pathForResource:@"MP3Sample" ofType:@"mp3"];
     if (!self.player) {
         NSLog(@"还没创建播放器呢，别着急...");
         return;
     }
-    [self.player fl_addUrl:str];
+    [self.player fl_addUrl:@[str,str1]];
     
     self.totalUrlCount.text = [NSString stringWithFormat:@"总剩下地址数：%zd",self.player.lastTotalItemsCount];
 }
@@ -160,6 +162,7 @@
 }
 
 - (void)fl_audioPlayer:(FLAudioPlayer *)audioPlayer cacheToCurrentBufferProgress:(NSNumber *)bufferProgress{
+    NSLog(@"bufferProgress = %.2lf",bufferProgress.floatValue);
     self.fl_slider.cacheValue = bufferProgress.floatValue;
 }
 
