@@ -156,8 +156,6 @@
 
 - (void)fl_audioPlayer:(FLAudioPlayer *)audioPlayer playingToCurrentProgress:(NSNumber *)progress withBufferProgress:(NSNumber *)bufferProgress{
     self.fl_slider.value = progress.floatValue;
-//    NSLog(@"VC -- progress = %.2lf",bufferProgress.floatValue);
-//    self.fl_slider.cacheValue = bufferProgress.floatValue;
     self.startLabel.text = FL_COVERTTIME(self.player.totalTime.doubleValue * progress.doubleValue);
 }
 
