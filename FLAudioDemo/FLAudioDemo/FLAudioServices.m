@@ -85,10 +85,8 @@ typedef NS_ENUM(NSUInteger, FLAudioRecorderErrorCode) {
     // 音频使用内置扬声器和麦克风
     [audioSession overrideOutputAudioPort:AVAudioSessionPortOverrideSpeaker error:&error];
     
-    /* The file type to record is inferred from the file extension. Will overwrite a file at the specified url if a file exists */
     self.Recorder = [[AVAudioRecorder alloc] initWithURL:[NSURL fileURLWithPath:[self fl_filePath]] settings:[self fl_recorderSetting] error:&error];
     if (error) {
-        NSLog(@"Error: %@", [error localizedDescription]);
         [self fl_delegateResponseFailureWithCode:FLAudioRecorderErrorByRecorderIsNotInit];
         return;
     }
@@ -153,10 +151,10 @@ typedef NS_ENUM(NSUInteger, FLAudioRecorderErrorCode) {
             [strongSelf fl_stop:nil];
         }
         else{
+            
             FL_DELEGATE_RESPONSE(strongSelf.delegate, @selector(fl_audioRecorder:recordingWithCurrentTime:), @[strongSelf,@(strongSelf.count++ / 100)], nil);
         }
     });
-    
 }
 // 内部计数器,不能这样，多线程会造成数据紊乱
 //static CGFloat count = 0;
@@ -193,7 +191,6 @@ typedef NS_ENUM(NSUInteger, FLAudioRecorderErrorCode) {
         // 重置计数器
         self.count = 0;
     }
-    
 }
 
 - (void)fl_pause{
@@ -422,6 +419,7 @@ typedef NS_ENUM(NSUInteger, FLAudioPlayerErrorCode) {
     FLAudioPlayerErrorByFailureToPlayToEnd,
     FLAudioPlayerErrorByEnterBackground,
     FLAudioPlayerErrorByPlayerIsNotInit,
+    FLAudioPlayerErrorByPlayerNoMoreValiableUrl,
     FLAudioPlayerErrorByUnknow
 };
 
@@ -493,7 +491,7 @@ typedef NS_ENUM(NSUInteger, FLAudioPlayerErrorCode) {
 
 - (void)fl_addUrl:(id)url{
     if (!self.player) {
-        NSLog(@"还没创建播放器呢");
+        [self fl_delegateResponseFailureWithCode:FLAudioPlayerErrorByPlayerIsNotInit];
         return;
     }
     if ([url isKindOfClass:[NSString class]]) {
@@ -515,7 +513,12 @@ typedef NS_ENUM(NSUInteger, FLAudioPlayerErrorCode) {
 }
 
 - (void)fl_moveToNext{
-    if (!self.player || !self.valiableUrls.count) {
+    if (!self.player) {
+        [self fl_delegateResponseFailureWithCode:FLAudioPlayerErrorByPlayerIsNotInit];
+        return;
+    }
+    if (!self.valiableUrls.count) {
+        [self fl_delegateResponseFailureWithCode:FLAudioPlayerErrorByPlayerNoMoreValiableUrl];
         return;
     }
     if (self.currentIndex != self.valiableUrls.count - 1) {
@@ -525,7 +528,12 @@ typedef NS_ENUM(NSUInteger, FLAudioPlayerErrorCode) {
 }
 
 - (void)fl_moveToPrevious{
-    if (!self.player || !self.valiableUrls.count) {
+    if (!self.player) {
+        [self fl_delegateResponseFailureWithCode:FLAudioPlayerErrorByPlayerIsNotInit];
+        return;
+    }
+    if (!self.valiableUrls.count) {
+        [self fl_delegateResponseFailureWithCode:FLAudioPlayerErrorByPlayerNoMoreValiableUrl];
         return;
     }
     if (self.currentIndex != 0) {
@@ -535,12 +543,20 @@ typedef NS_ENUM(NSUInteger, FLAudioPlayerErrorCode) {
 }
 
 - (void)fl_moveToIndex:(NSInteger)index andStartImmediately:(BOOL)startImmediately{
-    if (!self.player || !self.valiableUrls.count) {
+    if (!self.player) {
+        [self fl_delegateResponseFailureWithCode:FLAudioPlayerErrorByPlayerIsNotInit];
+        return;
+    }
+    if (!self.valiableUrls.count) {
+        [self fl_delegateResponseFailureWithCode:FLAudioPlayerErrorByPlayerNoMoreValiableUrl];
         return;
     }
     
-    if (index < 0 || index > self.valiableUrls.count - 1) {
-        return;
+    if (index < 0) {
+        index = 0;
+    }
+    else if (index > self.valiableUrls.count - 1){
+        index = self.valiableUrls.count - 1;
     }
     
     // stop current
@@ -590,6 +606,10 @@ typedef NS_ENUM(NSUInteger, FLAudioPlayerErrorCode) {
     }
 }
 
+- (void)fl_startAtBegining{
+     [self fl_seekToProgress:0.0f complete:nil];
+}
+
 - (void)fl_seekToProgress:(CGFloat)progress complete:(void (^)(BOOL))complete{
     [self fl_seekToProgress:progress andStartImmediately:YES complete:complete];
 }
@@ -625,20 +645,18 @@ typedef NS_ENUM(NSUInteger, FLAudioPlayerErrorCode) {
 - (void)fl_createPlayWithItem:(AVPlayerItem *)item andStartImmediately:(BOOL)startImmediately{
     // 销毁之前的
     [self fl_removeObserve];
-    // 创建新的
-    
+    // 初始化播放器
     if (!self.player) {
         self.player = [AVPlayer playerWithPlayerItem:item];
     }
     else{
         [self.player replaceCurrentItemWithPlayerItem:item];
     }
-//    self.semaphore = dispatch_semaphore_create(1);
+    // 监听
     [self fl_addObserve];
     self.playerStatus = Player_Stoping;
     if (startImmediately) {
-//        [self fl_start];
-        [self fl_seekToProgress:0.0f complete:nil];
+        [self fl_startAtBegining];
     }
 }
 
@@ -671,16 +689,11 @@ typedef NS_ENUM(NSUInteger, FLAudioPlayerErrorCode) {
     }
     [self fl_addObserverToPlayerItem:self.player.currentItem];
     
-    // 调用者主动stop、正常播放结束stop、没正常播放结束stop
     __weak typeof(self) weakSelf = self;
     self.timeObserver = [self.player addPeriodicTimeObserverForInterval:CMTimeMake(1, 1) queue:dispatch_get_main_queue() usingBlock:^(CMTime time) {
         typeof(self) strongSelf = weakSelf;
-//        if (strongSelf.bufferProgress.floatValue < 1.0) {
-//            dispatch_semaphore_wait(strongSelf.semaphore, DISPATCH_TIME_FOREVER);
-//        }
         CGFloat progress = strongSelf.currentTime.doubleValue / strongSelf.totalTime.doubleValue;
          [strongSelf fl_delegateResponseToSelector:@selector(fl_audioPlayer:playingToCurrentProgress:withBufferProgress:) withObject:@[strongSelf,@(FL_SAVE_PROGRESS(progress)),strongSelf.bufferProgress] complete:nil];
-        
     }];
 }
 
@@ -825,14 +838,9 @@ typedef NS_ENUM(NSUInteger, FLAudioPlayerErrorCode) {
         //缓冲总长度
         NSTimeInterval totalBuffer = startSeconds + durationSeconds;
         CGFloat bufferProgress = totalBuffer / self.totalTime.doubleValue;
-//        self.bufferProgress = @(FL_SAVE_PROGRESS(bufferProgress));
-        FL_DELEGATE_RESPONSE(self.delegate, @selector(fl_audioPlayer:cacheToCurrentBufferProgress:), @[self,@(FL_SAVE_PROGRESS(bufferProgress))], nil);
-//        if (self.bufferProgress.floatValue < 1.0) {
-//            dispatch_semaphore_signal(self.semaphore);
-//        }
+        [self fl_delegateResponseToSelector:@selector(fl_audioPlayer:cacheToCurrentBufferProgress:) withObject:@[self,@(FL_SAVE_PROGRESS(bufferProgress))] complete:nil];
     }
     else if ([keyPath isEqualToString:@"playbackBufferEmpty"]){
-//        self.bufferProgress = @0.0f;
     }
     else if ([keyPath isEqualToString:@"playbackLikelyToKeepUp"]){
     }
@@ -865,7 +873,7 @@ typedef NS_ENUM(NSUInteger, FLAudioPlayerErrorCode) {
             description = @"播放器出现错误，播放器未初始化";
             break;
         case 5:
-            description = @"未知错误";
+            description = @"播放器出现错误，没有可用的URL地址";
             break;
         default:
             description = @"未知错误";

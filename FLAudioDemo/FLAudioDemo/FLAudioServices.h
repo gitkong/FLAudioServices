@@ -194,7 +194,8 @@ typedef NS_ENUM(NSInteger,FLAudioPlayerStatus){
                                  1002：不能正常播放到结束位置
                                  1003：进入后台，此时会暂停播放，进入前台后自动播放
                                  1004:  播放器未初始化
-                                 1005:  未知错误
+                                 1005:  播放器没有可用播放的URL
+                                 其他:  未知错误
  */
 - (void)fl_audioPlayer:(FLAudioPlayer *)audioPlayer didFailureWithError:(NSError *)error;
 
@@ -206,6 +207,11 @@ typedef NS_ENUM(NSInteger,FLAudioPlayerStatus){
  表示当前可播放的url数组
  */
 @property (nonatomic,strong,readonly)NSMutableArray<NSString *> *valiableUrls;
+
+/**
+ 当前播放的URL在队列中的下标
+ */
+@property (nonatomic,assign,readonly)NSInteger currentIndex;
 
 /**
  剩下可播放的url地址数
